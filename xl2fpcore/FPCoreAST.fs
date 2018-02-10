@@ -1,5 +1,6 @@
 ﻿module FPCoreAST
 
+open System
 open System.Numerics
 
 //  FPCORE GRAMMAR
@@ -19,9 +20,20 @@ open System.Numerics
 //      :symbol string
 //      :symbol ( symbol* ) 
 
+// newline
+let NL = System.Environment.NewLine
+
+// indent function
+let Ind(n: int) = String.replicate n " "
+
 type FPNum =
     | Int of BigInteger
     | Frac of BigInteger * BigInteger
+    member self.ToExpr(ind: int) =
+        (Ind ind) +
+        match self with
+        | Int i -> i.ToString()
+        | Frac(n,d) -> n.ToString() + "." + d.ToString()
 
 and FPConstant =
     | E
@@ -39,8 +51,27 @@ and FPConstant =
     | SQRT1_2
     | INFINITY
     | NAN
+    member self.ToExpr(ind: int) =
+        (Ind ind) +
+        match self with
+        | E         -> "E"
+        | LOG2E     -> "LOG2E"
+        | LOG10E    -> "LOG10E"
+        | LN2       -> "LN2"
+        | LN10      -> "LN10"
+        | PI        -> "PI"
+        | PI_2      -> "PI_2"
+        | PI_4      -> "PI_4"
+        | N1_PI     -> "1_PI"
+        | N2_PI     -> "2_PI"
+        | N2_SQRTPI -> "2_SQRTPI"
+        | SQRT2     -> "SQRT2"
+        | SQRT1_2   -> "SQRT1_2"
+        | INFINITY  -> "INFINITY"
+        | NAN       -> "NAN"
 
-and FPSymbol = string
+and FPSymbol(s: string) =
+    member self.ToExpr(ind: int) = (Ind ind) + s
 
 and FPLogicalOperation =
     | LessThan
@@ -57,6 +88,23 @@ and FPLogicalOperation =
     | IsNaN
     | IsNormal
     | SignBit
+    member self.ToExpr(int: int) =
+        (Ind int) +
+        match self with
+        | LessThan              -> "<"
+        | GreaterThan           -> ">"
+        | LessThanOrEqual       -> "<="
+        | GreaterThanOrEqual    -> ">="
+        | Equal                 -> "=="
+        | NotEqual              -> "!="
+        | LAnd                  -> "and"
+        | LOr                   -> "or"
+        | LNot                  -> "not"
+        | IsFinite              -> "isfinite"
+        | IsInf                 -> "isinf"
+        | IsNaN                 -> "isnan"
+        | IsNormal              -> "isnormal"
+        | SignBit               -> "signbit"
 
 and FPMathOperation =
     | Plus
@@ -104,26 +152,129 @@ and FPMathOperation =
     | Trunc
     | Round
     | Nearbyint
+    member self.ToExpr(ind: int) =
+        (Ind ind) +
+        match self with
+        | Plus      -> "+"
+        | Minus     -> "-"
+        | Multiply  -> "*"
+        | Divide    -> "/"
+        | Fabs      -> "fabs"
+        | Fma       -> "fma"
+        | Exp       -> "exp"
+        | Exp2      -> "exp2"
+        | Expm1     -> "expm1"
+        | Log       -> "log"
+        | Log10     -> "log10"
+        | Log2      -> "log2"
+        | Log1p     -> "log1p"
+        | Pow       -> "pow"
+        | Sqrt      -> "sqrt"
+        | Cbrt      -> "cbrt"
+        | Hypot     -> "hypot"
+        | Sin       -> "sin"
+        | Cos       -> "cos"
+        | Tan       -> "tan"
+        | Asin      -> "asin"
+        | Acos      -> "acos"
+        | Atan      -> "atan"
+        | Atan2     -> "atan2"
+        | Sinh      -> "sinh"
+        | Cosh      -> "cosh"
+        | Tanh      -> "tanh"
+        | Asinh     -> "asinh"
+        | Acosh     -> "acosh"
+        | Atanh     -> "atanh"
+        | Erf       -> "erf"
+        | Erfc      -> "erfc"
+        | Tgamma    -> "tgamma"
+        | Lgamma    -> "lgamma"
+        | Ceil      -> "ceil"
+        | Floor     -> "floor"
+        | Fmod      -> "fmod"
+        | Remainder -> "remainder"
+        | Fmax      -> "fmax"
+        | Fmin      -> "fmin"
+        | Fdim      -> "fdim"
+        | Copysign  -> "copysign"
+        | Trunc     -> "trunc"
+        | Round     -> "round"
+        | Nearbyint -> "nearbyint"
 
 and FPOperation =
-    | FPLogicalOperation
-    | FPMathOperation
+    | FPLogicalOperation of FPLogicalOperation
+    | FPMathOperation of FPMathOperation
+    member self.ToExpr(ind: int) =
+        match self with
+        | FPLogicalOperation op -> op.ToExpr ind
+        | FPMathOperation op -> op.ToExpr ind
 
 and FPProperty =
     | PropExpr of FPSymbol * FPExpr
     | PropString of FPSymbol * string
     | PropSymbols of FPSymbol * FPSymbol list
+    member self.ToExpr(ind: int) =
+        (Ind ind) +
+        ":" +
+        match self with
+        | PropExpr(s,e) -> s.ToExpr 0 + Ind 1 + e.ToExpr 0
+        | PropString(s,s') -> s.ToExpr 0 + s'
+        | PropSymbols(s,xs) ->
+            let symbs = String.Join(" ", List.map (fun (sym: FPSymbol) -> sym.ToExpr 0) xs)
+            (s.ToExpr 0) + symbs
 
-and FPIf = FPExpr * FPExpr * FPExpr
+and FPIf(cond: FPExpr, dotrue: FPExpr, dofalse: FPExpr) =
+    // ( if expr expr expr )
+    member self.ToExpr(ind: int) =
+        (Ind ind) + "(if " + cond.ToExpr 0 + NL +
+        dotrue.ToExpr (ind + 1) + NL +
+        dofalse.ToExpr (ind + 1) + ")"
 
-and FPLet = (FPSymbol * FPExpr) list * FPExpr
+and FPLet(binds: (FPSymbol * FPExpr) list, in_expr: FPExpr) =
+    // ( let ( [ symbol expr ]* ) expr )
+    member self.ToExpr(ind: int) =
+        let bindsStr = String.Join(
+                        " ",
+                        List.map (fun (s: FPSymbol, e: FPExpr) ->
+                          "[" + (s.ToExpr 0) + " " + (e.ToExpr 0) + "]"
+                        ) binds)
+        (Ind ind) + "(let (" + bindsStr + ")" + NL + in_expr.ToExpr (ind + 1) + ")"
 
-and FPWhile = (FPSymbol * FPExpr * FPExpr) list * FPExpr
+and FPWhile(cond: FPExpr, binds: (FPSymbol*FPExpr*FPExpr) list, body: FPExpr) =
+    // ( while expr ( [ symbol expr expr ]* ) expr )
+    member self.ToExpr(ind: int) =
+        let bindsStr = String.Join(
+                         " ",
+                         List.map (fun (s: FPSymbol, e1: FPExpr, e2: FPExpr) ->
+                            "[" + s.ToExpr 0 + " " + e1.ToExpr 0 + e2.ToExpr 0 + "]"
+                         )
+                       )
+        (Ind ind) + "(while" + cond.ToExpr 0 + "(" + bindsStr + ")" + body.ToExpr 0 + ")"
 
 and FPExpr =
-    | FPNum
-    | FPConstant
-    | FPSymbol
-    | FPOperation
+    | FPNum of FPNum
+    | FPConstant of FPConstant
+    | FPSymbol of FPSymbol
+    | FPOperation of FPOperation
+    | FPIf of FPIf
+    | FPLet of FPLet
+    | FPWhile of FPWhile
+    member self.ToExpr(ind: int) =
+        match self with
+        | FPNum(n) -> n.ToExpr ind
+        | FPConstant(c) -> c.ToExpr ind
+        | FPSymbol(s) -> s.ToExpr ind
+        | FPOperation(op) -> op.ToExpr ind
+        | FPIf(e) -> e.ToExpr ind
+        | FPWhile(e) -> e.ToExpr ind
 
-and FPCore = FPSymbol list * FPProperty list * FPExpr
+and FPCore(args: FPSymbol list, props: FPProperty list, body: FPExpr) =
+    // (FPCore (x)
+    //  :name "NMSE example 3.1"
+    //  :cite (hamming-1987)
+    //  :pre (>= x 0)
+    //  (- (sqrt (+ x 1)) (sqrt x)))
+    member self.ToExpr(ind: int) =
+        let argStr = String.Join(" ", List.map (fun (arg: FPSymbol) -> arg.ToExpr 0) args)
+        let popStr = String.Join(NL, List.map (fun (prop: FPProperty) -> prop.ToExpr (ind + 1)) props)
+        (Ind ind) + "(FPCore (" + argStr + ")" + NL + popStr + NL + body.ToExpr (ind + 1) + ")"
