@@ -26,14 +26,9 @@ let NL = System.Environment.NewLine
 // indent function
 let Ind(n: int) = String.replicate n " "
 
-type FPNum =
-    | Int of BigInteger
-    | Frac of BigInteger * BigInteger
+type FPNum(num: double) =
     member self.ToExpr(ind: int) =
-        (Ind ind) +
-        match self with
-        | Int i -> i.ToString()
-        | Frac(n,d) -> n.ToString() + "." + d.ToString()
+        (Ind ind) + num.ToString()
 
 and FPConstant =
     | E
@@ -202,12 +197,16 @@ and FPMathOperation =
         | Nearbyint -> "nearbyint"
 
 and FPOperation =
-    | FPLogicalOperation of FPLogicalOperation
-    | FPMathOperation of FPMathOperation
+    | LogicalOperation of FPLogicalOperation * FPExpr list
+    | MathOperation of FPMathOperation * FPExpr list
     member self.ToExpr(ind: int) =
         match self with
-        | FPLogicalOperation op -> op.ToExpr ind
-        | FPMathOperation op -> op.ToExpr ind
+        | LogicalOperation(op, exprs) ->
+            let exprStr = String.Join(" ", List.map (fun (e: FPExpr) -> e.ToExpr 0) exprs)
+            (Ind ind) + "(" + op.ToExpr 0 + " " + exprStr + ")"
+        | MathOperation(op, exprs) ->
+            let exprStr = String.Join(" ", List.map (fun (e: FPExpr) -> e.ToExpr 0) exprs)
+            (Ind ind) + "(" + op.ToExpr 0 + " " + exprStr + ")"
 
 and FPProperty =
     | PropExpr of FPSymbol * FPExpr
@@ -252,21 +251,21 @@ and FPWhile(cond: FPExpr, binds: (FPSymbol*FPExpr*FPExpr) list, body: FPExpr) =
         (Ind ind) + "(while" + cond.ToExpr 0 + "(" + bindsStr + ")" + body.ToExpr 0 + ")"
 
 and FPExpr =
-    | FPNum of FPNum
-    | FPConstant of FPConstant
-    | FPSymbol of FPSymbol
-    | FPOperation of FPOperation
-    | FPIf of FPIf
-    | FPLet of FPLet
-    | FPWhile of FPWhile
+    | Num of FPNum
+    | Constant of FPConstant
+    | Symbol of FPSymbol
+    | Operation of FPOperation
+    | If of FPIf
+    | Let of FPLet
+    | While of FPWhile
     member self.ToExpr(ind: int) =
         match self with
-        | FPNum(n) -> n.ToExpr ind
-        | FPConstant(c) -> c.ToExpr ind
-        | FPSymbol(s) -> s.ToExpr ind
-        | FPOperation(op) -> op.ToExpr ind
-        | FPIf(e) -> e.ToExpr ind
-        | FPWhile(e) -> e.ToExpr ind
+        | Num(n) -> n.ToExpr ind
+        | Constant(c) -> c.ToExpr ind
+        | Symbol(s) -> s.ToExpr ind
+        | Operation(op) -> op.ToExpr ind
+        | If(e) -> e.ToExpr ind
+        | While(e) -> e.ToExpr ind
 
 and FPCore(args: FPSymbol list, props: FPProperty list, body: FPExpr) =
     // (FPCore (x)
