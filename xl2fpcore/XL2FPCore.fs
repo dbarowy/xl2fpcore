@@ -3,6 +3,12 @@
 open FPCoreAST
 open System
 
+let AddressNormalizer(a: AST.Address) =
+    // TODO:  use "local" addresses for now;
+    // really, we should come up with a scheme
+    // to get a fresh variable for every new reference
+    Symbol(FPSymbol(a.A1Local().ToLower()))
+
 let rec FormulaToFPCore(expr: AST.Expression) : FPCore =
     FPCore([], [], ExprToFPExpr(expr))
 
@@ -16,7 +22,9 @@ and ExprToFPExpr(expr: AST.Expression) : FPExpr =
 and RefToFPExpr(r: AST.Reference) : FPExpr =
     match r with
     | :? AST.ReferenceRange as rng -> failwith "todo 4"
-    | :? AST.ReferenceAddress as addr -> failwith "todo 5"
+        //Array.map AddressNormalizer (rng.Range.Addresses)
+        //|> Array.map 
+    | :? AST.ReferenceAddress as addr -> AddressNormalizer (addr.Address)
     | :? AST.ReferenceNamed as name -> failwith "todo 6"
     | :? AST.ReferenceFunction as func -> FunctionToFPExpr func
     | :? AST.ReferenceConstant as c -> Num(FPNum(c.Value))
