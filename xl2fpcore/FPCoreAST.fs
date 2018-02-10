@@ -21,7 +21,7 @@ open System.Numerics
 //      :symbol ( symbol* ) 
 
 // newline
-let NL = System.Environment.NewLine
+//let NL = System.Environment.NewLine
 
 // indent function
 let Ind(n: int) = String.replicate n " "
@@ -225,8 +225,8 @@ and FPProperty =
 and FPIf(cond: FPExpr, dotrue: FPExpr, dofalse: FPExpr) =
     // ( if expr expr expr )
     member self.ToExpr(ind: int) =
-        (Ind ind) + "(if " + cond.ToExpr 0 + NL +
-        dotrue.ToExpr (ind + 1) + NL +
+        (Ind ind) + "(if " + cond.ToExpr 0 + (Ind 1) +
+        dotrue.ToExpr (ind + 1) +
         dofalse.ToExpr (ind + 1) + ")"
 
 and FPLet(binds: (FPSymbol * FPExpr) list, in_expr: FPExpr) =
@@ -237,7 +237,7 @@ and FPLet(binds: (FPSymbol * FPExpr) list, in_expr: FPExpr) =
                         List.map (fun (s: FPSymbol, e: FPExpr) ->
                           "[" + (s.ToExpr 0) + " " + (e.ToExpr 0) + "]"
                         ) binds)
-        (Ind ind) + "(let (" + bindsStr + ")" + NL + in_expr.ToExpr (ind + 1) + ")"
+        (Ind ind) + "(let (" + bindsStr + ")" + (Ind 1) + in_expr.ToExpr (ind + 1) + ")"
 
 and FPWhile(cond: FPExpr, binds: (FPSymbol*FPExpr*FPExpr) list, body: FPExpr) =
     // ( while expr ( [ symbol expr expr ]* ) expr )
@@ -275,5 +275,5 @@ and FPCore(args: FPSymbol list, props: FPProperty list, body: FPExpr) =
     //  (- (sqrt (+ x 1)) (sqrt x)))
     member self.ToExpr(ind: int) =
         let argStr = String.Join(" ", List.map (fun (arg: FPSymbol) -> arg.ToExpr 0) args)
-        let popStr = String.Join(NL, List.map (fun (prop: FPProperty) -> prop.ToExpr (ind + 1)) props)
-        (Ind ind) + "(FPCore (" + argStr + ")" + NL + popStr + NL + body.ToExpr (ind + 1) + ")"
+        let popStr = String.Join(" ", List.map (fun (prop: FPProperty) -> prop.ToExpr (ind + 1)) props)
+        (Ind ind) + "(FPCore (" + argStr + ")" + " " + popStr + " " + body.ToExpr (ind + 1) + ")"
