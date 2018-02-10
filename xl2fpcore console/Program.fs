@@ -21,11 +21,12 @@ let rec REPL() =
     printf "> "
     match Console.ReadLine() with
     | "quit" -> ()
-    | expr ->
+    | input ->
         try
             printfn "Parsing..."
-            Parcel.consoleParser expr
-            let ast = GetAST
+            let ast = GetAST input
+            let fpstr = XL2FPCore.XLExprToFPCore ast
+            printfn "%A" fpstr
         with
         | :? AST.IndirectAddressingNotSupportedException as ex ->
             printfn "Indirect addressing mode is not presently supported:\n%s" ex.Message

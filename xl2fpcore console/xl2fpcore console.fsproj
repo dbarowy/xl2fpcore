@@ -90,6 +90,11 @@
       <Project>{6de2a2b9-c029-4bdb-8992-d16276471d9f}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\xl2fpcore\xl2fpcore.fsproj">
+      <Name>xl2fpcore</Name>
+      <Project>{3811543e-4d53-44ff-8d85-7f9e9d68dd71}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
