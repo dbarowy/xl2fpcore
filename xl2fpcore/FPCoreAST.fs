@@ -258,7 +258,8 @@ and FPExpr =
     | If of FPIf
     | Let of FPLet
     | While of FPWhile
-    member self.ToExpr(ind: int) =
+    | PseudoList of FPExpr list    // added by me; not present in FPCore
+    member self.ToExpr(ind: int) : string =
         match self with
         | Num(n) -> n.ToExpr ind
         | Constant(c) -> c.ToExpr ind
@@ -266,6 +267,7 @@ and FPExpr =
         | Operation(op) -> op.ToExpr ind
         | If(e) -> e.ToExpr ind
         | While(e) -> e.ToExpr ind
+        | PseudoList(xs) -> "[" + String.Join(",", (List.map (fun (s: FPExpr) -> s.ToExpr ind) xs)) + "]"
 
 and FPCore(args: FPSymbol list, props: FPProperty list, body: FPExpr) =
     // (FPCore (x)

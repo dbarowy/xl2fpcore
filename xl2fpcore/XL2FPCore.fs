@@ -3,11 +3,16 @@
 open FPCoreAST
 open System
 
-let AddressNormalizer(a: AST.Address) =
+let NormalizeAddr(a: AST.Address) =
     // TODO:  use "local" addresses for now;
     // really, we should come up with a scheme
     // to get a fresh variable for every new reference
     Symbol(FPSymbol(a.A1Local().ToLower()))
+
+let ExpandPseudoList(e: FPExpr) : FPExpr list option =
+    match e with
+    | PseudoList(xs) -> Some xs
+    | _ -> None
 
 let rec FormulaToFPCore(expr: AST.Expression) : FPCore =
     FPCore([], [], ExprToFPExpr(expr))
@@ -21,10 +26,12 @@ and ExprToFPExpr(expr: AST.Expression) : FPExpr =
 
 and RefToFPExpr(r: AST.Reference) : FPExpr =
     match r with
-    | :? AST.ReferenceRange as rng -> failwith "todo 4"
-        //Array.map AddressNormalizer (rng.Range.Addresses)
-        //|> Array.map 
-    | :? AST.ReferenceAddress as addr -> AddressNormalizer (addr.Address)
+    | :? AST.ReferenceRange as rng -> 
+        let addrs =
+            Array.map NormalizeAddr (rng.Range.Addresses())
+            |> Array.toList
+        PseudoList(addrs)
+    | :? AST.ReferenceAddress as addr -> NormalizeAddr (addr.Address)
     | :? AST.ReferenceNamed as name -> failwith "todo 6"
     | :? AST.ReferenceFunction as func -> FunctionToFPExpr func
     | :? AST.ReferenceConstant as c -> Num(FPNum(c.Value))
@@ -34,6 +41,12 @@ and RefToFPExpr(r: AST.Reference) : FPExpr =
 and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr =
     match f.FunctionName with
     | "SUM" ->
+        // Convert args
+        let fpargs = List.map (fun arg -> ExprToFPExpr arg) f.ArgumentList
+
+        // If any args are PseudoFP constructs, desugar them
+
+
         let rec proc(args: AST.Expression list) : FPExpr option =
             match args with
             | x1 :: x2 :: [] ->
