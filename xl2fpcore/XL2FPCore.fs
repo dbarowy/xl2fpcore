@@ -3,6 +3,15 @@
 open FPCoreAST
 open System
 
+let rec UnrollWithOp(exprs: FPExpr list)(op: FPMathOperation) : FPExpr =
+    match exprs with
+    | x1 :: x2 :: [] ->
+        FPExpr.Operation(FPOperation.MathOperation(op, [x1; x2]))
+    | x1 :: [] -> x1
+    | [] -> failwith "Does this actually happen?"
+    | x1 :: rest ->
+        FPExpr.Operation(FPOperation.MathOperation(op, [x1; UnrollWithOp rest op]))
+
 let NormalizeAddr(a: AST.Address) =
     // TODO:  use "local" addresses for now;
     // really, we should come up with a scheme
@@ -29,40 +38,61 @@ and RefToFPExpr(r: AST.Reference) : FPExpr*FPSymbol list =
     match r with
     | :? AST.ReferenceRange as rng -> 
         let addrs =
-            Array.map (fun a -> Symbol(NormalizeAddr a)) (rng.Range.Addresses())
+            Array.map (fun a -> NormalizeAddr a) (rng.Range.Addresses())
             |> Array.toList
-        PseudoList(addrs),[]
+        let pseudolist = addrs |> List.map (fun s -> Symbol(s)) |> (fun xs -> PseudoList(xs))
+        pseudolist,addrs
     | :? AST.ReferenceAddress as addr ->
         let na = NormalizeAddr (addr.Address)
         Symbol(na), [na]
     | :? AST.ReferenceNamed as name -> failwith "todo 6"
-    //| :? AST.ReferenceFunction as func -> FunctionToFPExpr func,[]
-    | :? AST.ReferenceFunction as func -> failwith "todo 7"
+    | :? AST.ReferenceFunction as func -> FunctionToFPExpr func
     | :? AST.ReferenceConstant as c -> Num(FPNum(c.Value)),[]
     | :? AST.ReferenceString as str -> failwith "todo 8"
     | :? AST.ReferenceBoolean as b -> failwith "todo 9"
     | _ -> failwith "Unknown reference expression."
 
-//and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr =
-//    match f.FunctionName with
-//    | "SUM" ->
-//        // Convert args
-//        let fpargs = List.map (fun arg -> ExprToFPExpr arg) f.ArgumentList
+and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
+    // Convert args
+    let fp_exprs,fpargs =
+        List.map (fun arg -> ExprToFPExpr arg) f.ArgumentList
+        |> List.unzip
+        |> (fun (exprs, xsxs) -> exprs, List.concat xsxs)
 
-//        // If any args are PseudoFP constructs, desugar them
-//        let rec proc(args: AST.Expression list) : FPExpr option =
-//            match args with
-//            | x1 :: x2 :: [] ->
-//                Some (FPExpr.Operation(FPOperation.MathOperation(FPMathOperation.Plus, [ExprToFPExpr x1; ExprToFPExpr x2])))
-//            | x :: rest ->
-//                let xe = ExprToFPExpr x
-//                match proc rest with
-//                | Some(reste) -> Some (FPExpr.Operation(FPOperation.MathOperation(FPMathOperation.Plus, [xe; reste])))
-//                | None -> Some xe
-//            | [] -> None
+    match f.FunctionName with
+    | "SUM" ->
+        let rec proc(args: AST.Expression list) : (FPExpr*FPSymbol list) option =
+            match args with
+            | x1 :: x2 :: [] ->
+                let x1expr,x1args = ExprToFPExpr x1
+                let x2expr,x2args = ExprToFPExpr x2
+                
+                let x1unroll =
+                    match x1expr with
+                    | PseudoList(x1s) -> UnrollWithOp x1s FPMathOperation.Plus
+                    | _ -> x1expr
 
-//        match proc (f.ArgumentList) with
-//        | Some expr -> expr
-//        | None -> Num(FPNum(0.0))   // Literally, SUM of nothing
+                let x2unroll = 
+                    match x2expr with
+                    | PseudoList(x2s) ->  UnrollWithOp x2s FPMathOperation.Plus
+                    | _ -> x2expr
+
+                Some (FPExpr.Operation(FPOperation.MathOperation(FPMathOperation.Plus, [x1unroll; x2unroll])), x1args @ x2args)
+            | x :: rest ->
+                let xe,xeargs = ExprToFPExpr x
+
+                let xeunroll =
+                    match xe with
+                    | PseudoList(xes) -> UnrollWithOp xes FPMathOperation.Plus
+                    | _ -> xe
+
+                match proc rest with
+                | Some(reste, restargs) -> Some (FPExpr.Operation(FPOperation.MathOperation(FPMathOperation.Plus, [xeunroll; reste])), xeargs @ restargs)
+                | None -> Some (xeunroll,xeargs)
+            | [] -> None
+
+        match proc (f.ArgumentList) with
+        | Some expr -> expr
+        | None -> Num(FPNum(0.0)),[]   // Literally, SUM of nothing
         
-//    | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
+    | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
