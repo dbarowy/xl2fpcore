@@ -53,46 +53,40 @@ and RefToFPExpr(r: AST.Reference) : FPExpr*FPSymbol list =
     | _ -> failwith "Unknown reference expression."
 
 and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
-    // Convert args
-    let fp_exprs,fpargs =
-        List.map (fun arg -> ExprToFPExpr arg) f.ArgumentList
-        |> List.unzip
-        |> (fun (exprs, xsxs) -> exprs, List.concat xsxs)
-
     match f.FunctionName with
-    | "SUM" ->
-        let rec proc(args: AST.Expression list) : (FPExpr*FPSymbol list) option =
-            match args with
-            | x1 :: x2 :: [] ->
-                let x1expr,x1args = ExprToFPExpr x1
-                let x2expr,x2args = ExprToFPExpr x2
-                
-                let x1unroll =
-                    match x1expr with
-                    | PseudoList(x1s) -> UnrollWithOp (List.rev x1s) FPMathOperation.Plus
-                    | _ -> x1expr
-
-                let x2unroll = 
-                    match x2expr with
-                    | PseudoList(x2s) ->  UnrollWithOp (List.rev x2s) FPMathOperation.Plus
-                    | _ -> x2expr
-
-                Some (FPExpr.Operation(FPOperation.MathOperation(FPMathOperation.Plus, [x1unroll; x2unroll])), x1args @ x2args)
-            | x :: rest ->
-                let xe,xeargs = ExprToFPExpr x
-
-                let xeunroll =
-                    match xe with
-                    | PseudoList(xes) -> UnrollWithOp (List.rev xes) FPMathOperation.Plus
-                    | _ -> xe
-
-                match proc rest with
-                | Some(reste, restargs) -> Some (FPExpr.Operation(FPOperation.MathOperation(FPMathOperation.Plus, [xeunroll; reste])), xeargs @ restargs)
-                | None -> Some (xeunroll,xeargs)
-            | [] -> None
-
-        match proc (List.rev f.ArgumentList) with
-        | Some expr -> expr
-        | None -> Num(FPNum(0.0)),[]   // Literally, SUM of nothing
-        
+    | "SUM" -> XLUnrollWithOpAndDefault (List.rev f.ArgumentList) Plus (Num(FPNum(0.0)),[])       
     | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
+
+and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(def: FPExpr*FPSymbol list) : FPExpr*FPSymbol list =
+    let rec proc(exprs: AST.Expression list)(op: FPMathOperation) =
+        match exprs with
+        | x1 :: x2 :: [] ->
+            let x1expr,x1args = ExprToFPExpr x1
+            let x2expr,x2args = ExprToFPExpr x2
+                
+            let x1unroll =
+                match x1expr with
+                | PseudoList(x1s) -> UnrollWithOp (List.rev x1s) op
+                | _ -> x1expr
+
+            let x2unroll = 
+                match x2expr with
+                | PseudoList(x2s) ->  UnrollWithOp (List.rev x2s) op
+                | _ -> x2expr
+
+            Some (FPExpr.Operation(FPOperation.MathOperation(op, [x1unroll; x2unroll])), x1args @ x2args)
+        | x :: rest ->
+            let xe,xeargs = ExprToFPExpr x
+
+            let xeunroll =
+                match xe with
+                | PseudoList(xes) -> UnrollWithOp (List.rev xes) op
+                | _ -> xe
+
+            match proc rest op with
+            | Some(reste, restargs) -> Some (FPExpr.Operation(FPOperation.MathOperation(op, [xeunroll; reste])), xeargs @ restargs)
+            | None -> Some (xeunroll,xeargs)
+        | [] -> None
+    match proc exprs op with
+    | Some expr -> expr
+    | None -> def

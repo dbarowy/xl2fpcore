@@ -53,6 +53,18 @@ type BasicTests () =
             FPCore(
                 [a1; a2; a3],
                 [],
-                FPExpr.Operation(FPOperation.MathOperation(FPMathOperation.Plus, [FPExpr.Operation(FPOperation.MathOperation(FPMathOperation.Plus, [Symbol(a1); Symbol(a2)])); Symbol(a3)]))
+                FPExpr.Operation(
+                    FPOperation.MathOperation(
+                        FPMathOperation.Plus,
+                        [FPExpr.Operation(
+                            FPOperation.MathOperation(
+                                FPMathOperation.Plus,
+                                [Symbol(a1);
+                                 Symbol(a2)]
+                            )
+                         );
+                         Symbol(a3)]
+                    )
+                )
             )
         ParserTest xl_expr fp_expected
