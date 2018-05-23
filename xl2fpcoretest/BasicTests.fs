@@ -24,6 +24,8 @@ type BasicTests () =
         try
             let ast = GetAST xl_expr
             let fp_got = XL2FPCore.FormulaToFPCore ast
+            let expected_str = fp_expected.ToExpr(0)
+            let got_str = fp_got.ToExpr(0)
             Assert.AreEqual(fp_expected, fp_got)
         with
         | :? ParseException -> Assert.Fail()

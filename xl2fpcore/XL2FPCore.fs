@@ -6,11 +6,11 @@ open System
 let rec UnrollWithOp(exprs: FPExpr list)(op: FPMathOperation) : FPExpr =
     match exprs with
     | x1 :: x2 :: [] ->
-        FPExpr.Operation(FPOperation.MathOperation(op, [x1; x2]))
+        FPExpr.Operation(FPOperation.MathOperation(op, [x2; x1]))
     | x1 :: [] -> x1
     | [] -> failwith "Does this actually happen?"
     | x1 :: rest ->
-        FPExpr.Operation(FPOperation.MathOperation(op, [x1; UnrollWithOp rest op]))
+        FPExpr.Operation(FPOperation.MathOperation(op, [UnrollWithOp rest op; x1]))
 
 let NormalizeAddr(a: AST.Address) =
     // TODO:  use "local" addresses for now;
@@ -69,12 +69,12 @@ and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
                 
                 let x1unroll =
                     match x1expr with
-                    | PseudoList(x1s) -> UnrollWithOp x1s FPMathOperation.Plus
+                    | PseudoList(x1s) -> UnrollWithOp (List.rev x1s) FPMathOperation.Plus
                     | _ -> x1expr
 
                 let x2unroll = 
                     match x2expr with
-                    | PseudoList(x2s) ->  UnrollWithOp x2s FPMathOperation.Plus
+                    | PseudoList(x2s) ->  UnrollWithOp (List.rev x2s) FPMathOperation.Plus
                     | _ -> x2expr
 
                 Some (FPExpr.Operation(FPOperation.MathOperation(FPMathOperation.Plus, [x1unroll; x2unroll])), x1args @ x2args)
@@ -83,7 +83,7 @@ and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
 
                 let xeunroll =
                     match xe with
-                    | PseudoList(xes) -> UnrollWithOp xes FPMathOperation.Plus
+                    | PseudoList(xes) -> UnrollWithOp (List.rev xes) FPMathOperation.Plus
                     | _ -> xe
 
                 match proc rest with
@@ -91,7 +91,7 @@ and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
                 | None -> Some (xeunroll,xeargs)
             | [] -> None
 
-        match proc (f.ArgumentList) with
+        match proc (List.rev f.ArgumentList) with
         | Some expr -> expr
         | None -> Num(FPNum(0.0)),[]   // Literally, SUM of nothing
         
