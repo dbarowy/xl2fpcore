@@ -37,5 +37,5 @@ type BasicTests () =
     [<Test>]
     member this.SimpleReferenceExpr() =
         let xl_expr = "=A1"
-        let fp_expected = FPCore([], [], FPExpr.Symbol(FPSymbol("a1")))
+        let fp_expected = FPCore([FPSymbol("a1")], [], Symbol(FPSymbol("a1")))
         ParserTest xl_expr fp_expected
