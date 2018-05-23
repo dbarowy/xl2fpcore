@@ -57,7 +57,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Library1.fs" />
+    <Compile Include="BasicTests.fs" />
     <None Include="Script.fsx" />
     <Content Include="packages.config" />
   </ItemGroup>
@@ -83,6 +83,28 @@
       <HintPath>..\xl2fpcore\packages\System.ValueTuple.4.4.0\lib\net461\System.ValueTuple.dll</HintPath>
       <Private>True</Private>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\parcel\FParsecCS\FParsecCS.csproj">
+      <Name>FParsecCS</Name>
+      <Project>{35888456-3095-4133-92c8-6dd3205f4c2d}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\parcel\FParsec\FParsec.fsproj">
+      <Name>FParsec</Name>
+      <Project>{d8a416fa-be7d-4929-8a6a-da28b206853c}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\parcel\Parcel\ExcelParser.fsproj">
+      <Name>ExcelParser</Name>
+      <Project>{6de2a2b9-c029-4bdb-8992-d16276471d9f}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\xl2fpcore\xl2fpcore.fsproj">
+      <Name>xl2fpcore</Name>
+      <Project>{3811543e-4d53-44ff-8d85-7f9e9d68dd71}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>

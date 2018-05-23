@@ -37,6 +37,7 @@ and RefToFPExpr(r: AST.Reference) : FPExpr =
     | :? AST.ReferenceConstant as c -> Num(FPNum(c.Value))
     | :? AST.ReferenceString as str -> failwith "todo 8"
     | :? AST.ReferenceBoolean as b -> failwith "todo 9"
+    | _ -> failwith "Unknown reference expression."
 
 and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr =
     match f.FunctionName with
