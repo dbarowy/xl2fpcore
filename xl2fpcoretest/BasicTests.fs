@@ -20,14 +20,22 @@ type BasicTests () =
                 | Failure(errorMsg, _, _)   -> raise (ParseException errorMsg)
         ast
 
-    [<Test>]
-    member this.SimpleConstantExpr() =
-        let fp_expected = FPCore([], [], FPExpr.Num(FPNum(1.0)))
-
+    let ParserTest(xl_expr: string)(fp_expected: FPCore) : unit =
         try
-            let expr = "=1"
-            let ast = GetAST expr
+            let ast = GetAST xl_expr
             let fp_got = XL2FPCore.FormulaToFPCore ast
             Assert.AreEqual(fp_expected, fp_got)
         with
         | :? ParseException -> Assert.Fail()
+
+    [<Test>]
+    member this.SimpleConstantExpr() =
+        let xl_expr = "=1"
+        let fp_expected = FPCore([], [], FPExpr.Num(FPNum(1.0)))
+        ParserTest xl_expr fp_expected
+
+    [<Test>]
+    member this.SimpleReferenceExpr() =
+        let xl_expr = "=A1"
+        let fp_expected = FPCore([], [], FPExpr.Symbol(FPSymbol("a1")))
+        ParserTest xl_expr fp_expected
