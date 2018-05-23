@@ -68,3 +68,27 @@ type BasicTests () =
                 )
             )
         ParserTest xl_expr fp_expected
+
+    [<Test>]
+    member this.PrecedenceTest() =
+        // should be:
+        let xl_expr = "=2*2+2"
+        let fp_expected =
+            FPCore(
+                [],
+                [],
+                Operation(
+                    MathOperation(
+                        Plus,
+                        [Operation(
+                            MathOperation(
+                                Multiply,
+                                [Num(FPNum(2.0));
+                                 Num(FPNum(2.0))]
+                            )
+                        );
+                        Num(FPNum(2.0))]
+                    )
+                )
+            )
+        ParserTest xl_expr fp_expected

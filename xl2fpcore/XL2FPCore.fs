@@ -5,12 +5,10 @@ open System
 
 let rec UnrollWithOp(exprs: FPExpr list)(op: FPMathOperation) : FPExpr =
     match exprs with
-    | x1 :: x2 :: [] ->
-        FPExpr.Operation(FPOperation.MathOperation(op, [x2; x1]))
+    | x1 :: x2 :: [] -> Operation(MathOperation(op, [x2; x1]))
     | x1 :: [] -> x1
     | [] -> failwith "Does this actually happen?"
-    | x1 :: rest ->
-        FPExpr.Operation(FPOperation.MathOperation(op, [UnrollWithOp rest op; x1]))
+    | x1 :: rest -> Operation(MathOperation(op, [UnrollWithOp rest op; x1]))
 
 let NormalizeAddr(a: AST.Address) =
     // TODO:  use "local" addresses for now;
@@ -30,7 +28,7 @@ let rec FormulaToFPCore(expr: AST.Expression) : FPCore =
 and ExprToFPExpr(expr: AST.Expression) : FPExpr*FPSymbol list =
     match expr with
     | AST.ReferenceExpr(r) -> RefToFPExpr r
-    | AST.BinOpExpr(op, e1, e2) -> failwith "todo 1"
+    | AST.BinOpExpr(op, e1, e2) -> BinOpToFPExpr op (ExprToFPExpr e1) (ExprToFPExpr e2)
     | AST.UnaryOpExpr(op, e) -> failwith "todo 2"
     | AST.ParensExpr(e) -> failwith "todo 3"
 
@@ -57,6 +55,14 @@ and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
     | "SUM" -> XLUnrollWithOpAndDefault (List.rev f.ArgumentList) Plus (Num(FPNum(0.0)),[])       
     | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
 
+and BinOpToFPExpr(op: string)(e1: FPExpr*FPSymbol list)(e2: FPExpr*FPSymbol list) : FPExpr*FPSymbol list =
+    match op with
+    | "+" -> Operation(MathOperation(Plus, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | "-" -> Operation(MathOperation(Minus, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | "*" -> Operation(MathOperation(Multiply, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | "/" -> Operation(MathOperation(Divide, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | _ -> failwith "Unknown binary operator"
+
 and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(def: FPExpr*FPSymbol list) : FPExpr*FPSymbol list =
     let rec proc(exprs: AST.Expression list)(op: FPMathOperation) =
         match exprs with
@@ -74,7 +80,7 @@ and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(de
                 | PseudoList(x2s) ->  UnrollWithOp (List.rev x2s) op
                 | _ -> x2expr
 
-            Some (FPExpr.Operation(FPOperation.MathOperation(op, [x1unroll; x2unroll])), x1args @ x2args)
+            Some (Operation(MathOperation(op, [x1unroll; x2unroll])), x1args @ x2args)
         | x :: rest ->
             let xe,xeargs = ExprToFPExpr x
 
@@ -84,7 +90,7 @@ and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(de
                 | _ -> xe
 
             match proc rest op with
-            | Some(reste, restargs) -> Some (FPExpr.Operation(FPOperation.MathOperation(op, [xeunroll; reste])), xeargs @ restargs)
+            | Some(reste, restargs) -> Some (Operation(MathOperation(op, [xeunroll; reste])), xeargs @ restargs)
             | None -> Some (xeunroll,xeargs)
         | [] -> None
     match proc exprs op with
