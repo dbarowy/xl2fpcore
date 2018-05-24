@@ -52,6 +52,10 @@ and RefToFPExpr(r: AST.Reference) : FPExpr*FPSymbol list =
 
 and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
     match f.FunctionName with
+    | "AVERAGE" ->
+        let sum,args = XLUnrollWithOpAndDefault (List.rev f.ArgumentList) Plus (Num(FPNum(0.0)),[])
+        let n = XLCountUnroll f.ArgumentList
+        Operation(MathOperation(Divide, [sum; Num(FPNum(double n))])), args
     | "SUM" -> XLUnrollWithOpAndDefault (List.rev f.ArgumentList) Plus (Num(FPNum(0.0)),[])       
     | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
 
@@ -63,8 +67,20 @@ and BinOpToFPExpr(op: string)(e1: FPExpr*FPSymbol list)(e2: FPExpr*FPSymbol list
     | "/" -> Operation(MathOperation(Divide, [fst e1; fst e2])), (snd e1) @ (snd e2)
     | _ -> failwith "Unknown binary operator"
 
+and XLCountUnroll(exprs: AST.Expression list) : int =
+    match exprs with
+    | x :: rest ->
+        let xe,_ = ExprToFPExpr x
+        let count = match xe with
+        | PseudoList(xes) -> List.length xes
+        | _ -> 1
+        count + XLCountUnroll rest
+    | [] -> 0
+
 and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(def: FPExpr*FPSymbol list) : FPExpr*FPSymbol list =
     let rec proc(exprs: AST.Expression list)(op: FPMathOperation) =
+        // we must match in pairs because we're unrolling with a binary op;
+        // we also must expand pseudolists (ranges) into FPCore expression lists
         match exprs with
         | x1 :: x2 :: [] ->
             let x1expr,x1args = ExprToFPExpr x1

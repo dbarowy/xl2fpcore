@@ -43,6 +43,39 @@ type BasicTests () =
         ParserTest xl_expr fp_expected
 
     [<Test>]
+    member this.AVERAGEExpr1() =
+        // should be: (FPCore (a1 a2 a3) (/ (+ (+ a1 a2) a3)3))
+        let xl_expr = "=AVERAGE(A1:A3)"
+        let fp_expected =
+            let a1 = FPSymbol("a1")
+            let a2 = FPSymbol("a2")
+            let a3 = FPSymbol("a3")
+            FPCore(
+                [a1; a2; a3],
+                [],
+                Operation(
+                    MathOperation(
+                        Divide,
+                        [Operation(
+                         MathOperation(
+                            Plus,
+                            [Operation(
+                                MathOperation(
+                                    Plus,
+                                    [Symbol(a1);
+                                     Symbol(a2)]
+                                )
+                            );
+                            Symbol(a3)]
+                         )
+                        );
+                        Num(FPNum(3.0))]
+                    )
+                )
+            )
+        ParserTest xl_expr fp_expected
+
+    [<Test>]
     member this.SUMExpr1() =
         // should be: (FPCore (a1 a2 a3) (+ (+ a1 a2) a3))
         let xl_expr = "=SUM(A1:A3)"
@@ -53,12 +86,12 @@ type BasicTests () =
             FPCore(
                 [a1; a2; a3],
                 [],
-                FPExpr.Operation(
-                    FPOperation.MathOperation(
-                        FPMathOperation.Plus,
-                        [FPExpr.Operation(
-                            FPOperation.MathOperation(
-                                FPMathOperation.Plus,
+                Operation(
+                    MathOperation(
+                        Plus,
+                        [Operation(
+                            MathOperation(
+                                Plus,
                                 [Symbol(a1);
                                  Symbol(a2)]
                             )
