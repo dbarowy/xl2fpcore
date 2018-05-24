@@ -20,7 +20,7 @@ type BasicTests () =
                 | Failure(errorMsg, _, _)   -> raise (ParseException errorMsg)
         ast
 
-    let ParserTest(xl_expr: string)(fp_expected: FPCore) : unit =
+    let ParseAndTest(xl_expr: string)(fp_expected: FPCore) : unit =
         try
             let ast = GetAST xl_expr
             let fp_got = XL2FPCore.FormulaToFPCore ast
@@ -34,13 +34,13 @@ type BasicTests () =
     member self.SimpleConstantExpr() =
         let xl_expr = "=1"
         let fp_expected = FPCore([], [], FPExpr.Num(FPNum(1.0)))
-        ParserTest xl_expr fp_expected
+        ParseAndTest xl_expr fp_expected
 
     [<Test>]
     member self.SimpleReferenceExpr() =
         let xl_expr = "=A1"
         let fp_expected = FPCore([FPSymbol("a1")], [], Symbol(FPSymbol("a1")))
-        ParserTest xl_expr fp_expected
+        ParseAndTest xl_expr fp_expected
 
     [<Test>]
     member self.AVERAGEExpr1() =
@@ -73,10 +73,10 @@ type BasicTests () =
                     )
                 )
             )
-        ParserTest xl_expr fp_expected
+        ParseAndTest xl_expr fp_expected
     
     [<Test>]
-    member self.MinExpr1() =
+    member self.MINExpr1() =
         // should be: (FPCore (a1 a2 a3) (fmin (fmin a1 a2) a3))
         let xl_expr = "=MIN(A1:A3)"
         let fp_expected =
@@ -100,10 +100,10 @@ type BasicTests () =
                     )
                 )
             )
-        ParserTest xl_expr fp_expected
+        ParseAndTest xl_expr fp_expected
 
     [<Test>]
-    member self.MinExpr2() =
+    member self.MINExpr2() =
         // should be: (FPCore () (fmin (fmin (fmin 1 2) 3) 4))
         let xl_expr = "=MIN(1,2,3,4)"
         let fp_expected =
@@ -130,10 +130,10 @@ type BasicTests () =
                     )
                 )
             )
-        ParserTest xl_expr fp_expected
+        ParseAndTest xl_expr fp_expected
 
     [<Test>]
-    member self.MaxExpr1() =
+    member self.MAXExpr1() =
         // should be: (FPCore (a1 a2 a3) (fmax (fmax a1 a2) a3))
         let xl_expr = "=MAX(A1:A3)"
         let fp_expected =
@@ -157,10 +157,10 @@ type BasicTests () =
                     )
                 )
             )
-        ParserTest xl_expr fp_expected
+        ParseAndTest xl_expr fp_expected
 
     [<Test>]
-    member self.MaxExpr2() =
+    member self.MAXExpr2() =
         // should be: (FPCore () (fmax (fmax (fmax 1 2) 3) 4))
         let xl_expr = "=MAX(1,2,3,4)"
         let fp_expected =
@@ -187,7 +187,7 @@ type BasicTests () =
                     )
                 )
             )
-        ParserTest xl_expr fp_expected
+        ParseAndTest xl_expr fp_expected
 
     [<Test>]
     member self.SUMExpr1() =
@@ -214,7 +214,7 @@ type BasicTests () =
                     )
                 )
             )
-        ParserTest xl_expr fp_expected
+        ParseAndTest xl_expr fp_expected
 
     [<Test>]
     member self.PrecedenceTest() =
@@ -238,4 +238,4 @@ type BasicTests () =
                     )
                 )
             )
-        ParserTest xl_expr fp_expected
+        ParseAndTest xl_expr fp_expected
