@@ -31,19 +31,19 @@ type BasicTests () =
         | :? ParseException -> Assert.Fail()
 
     [<Test>]
-    member this.SimpleConstantExpr() =
+    member self.SimpleConstantExpr() =
         let xl_expr = "=1"
         let fp_expected = FPCore([], [], FPExpr.Num(FPNum(1.0)))
         ParserTest xl_expr fp_expected
 
     [<Test>]
-    member this.SimpleReferenceExpr() =
+    member self.SimpleReferenceExpr() =
         let xl_expr = "=A1"
         let fp_expected = FPCore([FPSymbol("a1")], [], Symbol(FPSymbol("a1")))
         ParserTest xl_expr fp_expected
 
     [<Test>]
-    member this.AVERAGEExpr1() =
+    member self.AVERAGEExpr1() =
         // should be: (FPCore (a1 a2 a3) (/ (+ (+ a1 a2) a3)3))
         let xl_expr = "=AVERAGE(A1:A3)"
         let fp_expected =
@@ -74,9 +74,123 @@ type BasicTests () =
                 )
             )
         ParserTest xl_expr fp_expected
+    
+    [<Test>]
+    member self.MinExpr1() =
+        // should be: (FPCore (a1 a2 a3) (fmin (fmin a1 a2) a3))
+        let xl_expr = "=MIN(A1:A3)"
+        let fp_expected =
+            let a1 = FPSymbol("a1")
+            let a2 = FPSymbol("a2")
+            let a3 = FPSymbol("a3")
+            FPCore(
+                [a1; a2; a3],
+                [],
+                Operation(
+                    MathOperation(
+                        Fmin,
+                        [Operation(
+                            MathOperation(
+                                Fmin,
+                                [Symbol(a1);
+                                 Symbol(a2)]
+                            )
+                         );
+                         Symbol(a3)]
+                    )
+                )
+            )
+        ParserTest xl_expr fp_expected
 
     [<Test>]
-    member this.SUMExpr1() =
+    member self.MinExpr2() =
+        // should be: (FPCore () (fmin (fmin (fmin 1 2) 3) 4))
+        let xl_expr = "=MIN(1,2,3,4)"
+        let fp_expected =
+            FPCore(
+                [],
+                [],
+                Operation(
+                    MathOperation(
+                        Fmin,
+                        [Operation(
+                            MathOperation(
+                                Fmin,
+                                [Operation(
+                                    MathOperation(
+                                        Fmin,
+                                        [Num(FPNum(1.0));
+                                         Num(FPNum(2.0))]
+                                    )
+                                 );
+                                 Num(FPNum(3.0))]
+                            )
+                         );
+                         Num(FPNum(4.0))]
+                    )
+                )
+            )
+        ParserTest xl_expr fp_expected
+
+    [<Test>]
+    member self.MaxExpr1() =
+        // should be: (FPCore (a1 a2 a3) (fmax (fmax a1 a2) a3))
+        let xl_expr = "=MAX(A1:A3)"
+        let fp_expected =
+            let a1 = FPSymbol("a1")
+            let a2 = FPSymbol("a2")
+            let a3 = FPSymbol("a3")
+            FPCore(
+                [a1; a2; a3],
+                [],
+                Operation(
+                    MathOperation(
+                        Fmax,
+                        [Operation(
+                            MathOperation(
+                                Fmax,
+                                [Symbol(a1);
+                                 Symbol(a2)]
+                            )
+                         );
+                         Symbol(a3)]
+                    )
+                )
+            )
+        ParserTest xl_expr fp_expected
+
+    [<Test>]
+    member self.MaxExpr2() =
+        // should be: (FPCore () (fmax (fmax (fmax 1 2) 3) 4))
+        let xl_expr = "=MAX(1,2,3,4)"
+        let fp_expected =
+            FPCore(
+                [],
+                [],
+                Operation(
+                    MathOperation(
+                        Fmax,
+                        [Operation(
+                            MathOperation(
+                                Fmax,
+                                [Operation(
+                                    MathOperation(
+                                        Fmax,
+                                        [Num(FPNum(1.0));
+                                         Num(FPNum(2.0))]
+                                    )
+                                 );
+                                 Num(FPNum(3.0))]
+                            )
+                         );
+                         Num(FPNum(4.0))]
+                    )
+                )
+            )
+        ParserTest xl_expr fp_expected
+
+    [<Test>]
+    member self.SUMExpr1() =
         // should be: (FPCore (a1 a2 a3) (+ (+ a1 a2) a3))
         let xl_expr = "=SUM(A1:A3)"
         let fp_expected =
@@ -103,7 +217,7 @@ type BasicTests () =
         ParserTest xl_expr fp_expected
 
     [<Test>]
-    member this.PrecedenceTest() =
+    member self.PrecedenceTest() =
         // should be:
         let xl_expr = "=2*2+2"
         let fp_expected =

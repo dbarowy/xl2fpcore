@@ -16,11 +16,6 @@ let NormalizeAddr(a: AST.Address) =
     // to get a fresh variable for every new reference
     FPSymbol(a.A1Local().ToLower())
 
-let ExpandPseudoList(e: FPExpr) : FPExpr list option =
-    match e with
-    | PseudoList(xs) -> Some xs
-    | _ -> None
-
 let rec FormulaToFPCore(expr: AST.Expression) : FPCore =
     let expr,args = ExprToFPExpr(expr)
     FPCore(args, [], expr)
@@ -51,13 +46,20 @@ and RefToFPExpr(r: AST.Reference) : FPExpr*FPSymbol list =
     | _ -> failwith "Unknown reference expression."
 
 and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
-    match f.FunctionName with
-    | "AVERAGE" ->
-        let sum,args = XLUnrollWithOpAndDefault (List.rev f.ArgumentList) Plus (Num(FPNum(0.0)),[])
-        let n = XLCountUnroll f.ArgumentList
-        Operation(MathOperation(Divide, [sum; Num(FPNum(double n))])), args
-    | "SUM" -> XLUnrollWithOpAndDefault (List.rev f.ArgumentList) Plus (Num(FPNum(0.0)),[])       
-    | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
+    let expr,args =
+        match f.FunctionName with
+        | "AVERAGE" ->
+            let sum,args = XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[])
+            let n = XLCountUnroll f.ArgumentList
+            Operation(MathOperation(Divide, [sum; Num(FPNum(double n))])), args
+        | "MAX" -> XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[])
+        | "MIN" -> XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[])
+        | "SUM" -> XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[])       
+        | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
+    
+    match expr with
+    | Sentinel -> raise (Exception ("Expression is not valid."))
+    | _ -> expr,args
 
 and BinOpToFPExpr(op: string)(e1: FPExpr*FPSymbol list)(e2: FPExpr*FPSymbol list) : FPExpr*FPSymbol list =
     match op with
@@ -96,7 +98,7 @@ and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(de
                 | PseudoList(x2s) ->  UnrollWithOp (List.rev x2s) op
                 | _ -> x2expr
 
-            Some (Operation(MathOperation(op, [x1unroll; x2unroll])), x1args @ x2args)
+            Some (Operation(MathOperation(op, [x2unroll; x1unroll])), x1args @ x2args)
         | x :: rest ->
             let xe,xeargs = ExprToFPExpr x
 
@@ -106,9 +108,9 @@ and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(de
                 | _ -> xe
 
             match proc rest op with
-            | Some(reste, restargs) -> Some (Operation(MathOperation(op, [xeunroll; reste])), xeargs @ restargs)
+            | Some(reste, restargs) -> Some (Operation(MathOperation(op, [reste; xeunroll])), xeargs @ restargs)
             | None -> Some (xeunroll,xeargs)
         | [] -> None
-    match proc exprs op with
+    match proc (List.rev exprs) op with
     | Some expr -> expr
     | None -> def

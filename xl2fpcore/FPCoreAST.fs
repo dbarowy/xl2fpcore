@@ -288,6 +288,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
     | Let of FPLet
     | While of FPWhile
     | PseudoList of FPExpr list    // added by me; not present in FPCore
+    | Sentinel                     // added by me; signals a nonsensical construction
     member self.ToExpr(ind: int) : string =
         match self with
         | Num(n) -> n.ToExpr ind
@@ -322,6 +323,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
         | Let(e) -> e.GetHashCode()
         | While(e) -> e.GetHashCode()
         | PseudoList(xs) -> xs.GetHashCode()
+    //override self.ToString() = self.ToExpr(0)
 
 and FPCore(args: FPSymbol list, props: FPProperty list, body: FPExpr) =
     // (FPCore (x)
