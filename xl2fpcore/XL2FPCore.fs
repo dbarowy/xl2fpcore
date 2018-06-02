@@ -20,13 +20,18 @@ let rec FormulaToFPCore(expr: AST.Expression) : FPCore =
     let expr,args = ExprToFPExpr(expr)
     FPCore(args, [], expr)
 
+// returns a tuple of two things:
+// first: the converted FPCore expression
+// second: a list of symbols representing Excel references that
+//         must be abstracted as FPCore arguments
 and ExprToFPExpr(expr: AST.Expression) : FPExpr*FPSymbol list =
     match expr with
     | AST.ReferenceExpr(r) -> RefToFPExpr r
     | AST.BinOpExpr(op, e1, e2) -> BinOpToFPExpr op (ExprToFPExpr e1) (ExprToFPExpr e2)
     | AST.UnaryOpExpr(op, e) -> failwith "todo 2"
-    | AST.ParensExpr(e) -> failwith "todo 3"
-
+    | AST.ParensExpr(e) ->
+        let e1,exs = ExprToFPExpr e
+        Parens(e1),exs
 and RefToFPExpr(r: AST.Reference) : FPExpr*FPSymbol list =
     match r with
     | :? AST.ReferenceRange as rng -> 

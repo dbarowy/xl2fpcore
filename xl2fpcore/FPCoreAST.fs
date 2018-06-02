@@ -219,7 +219,6 @@ and FPOperation =
         | MathOperation(op, exprs) ->
             let exprStr = String.Join(" ", List.map (fun (e: FPExpr) -> e.ToExpr 0) exprs)
             (Ind ind) + "(" + op.ToExpr 0 + " " + exprStr + ")"
-
 and [<CustomEquality; NoComparison>] FPProperty =
     | PropExpr of FPSymbol * FPExpr
     | PropString of FPSymbol * string
@@ -284,6 +283,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
     | Constant of FPConstant
     | Symbol of FPSymbol
     | Operation of FPOperation
+    | Parens of FPExpr
     | If of FPIf
     | Let of FPLet
     | While of FPWhile
@@ -295,6 +295,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
         | Constant(c) -> c.ToExpr ind
         | Symbol(s) -> s.ToExpr ind
         | Operation(op) -> op.ToExpr ind
+        | Parens(e) -> e.ToExpr ind
         | If(e) -> e.ToExpr ind
         | Let(e) -> e.ToExpr ind
         | While(e) -> e.ToExpr ind
@@ -308,6 +309,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
             | Constant(c),Constant(c2) -> c = c2
             | Symbol(s),Symbol(s2) -> s = s2
             | Operation(o),Operation(o2) -> o = o2
+            | Parens(e1),Parens(e2) -> e1 = e2
             | If(e),If(e2) -> e = e2
             | Let(e),Let(e2) -> e = e2
             | While(e),While(e2) -> e = e2
@@ -320,6 +322,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
         | Constant(c) -> c.GetHashCode()
         | Symbol(s) -> s.GetHashCode()
         | Operation(op) -> op.GetHashCode()
+        | Parens(e) -> e.GetHashCode()
         | If(e) -> e.GetHashCode()
         | Let(e) -> e.GetHashCode()
         | While(e) -> e.GetHashCode()

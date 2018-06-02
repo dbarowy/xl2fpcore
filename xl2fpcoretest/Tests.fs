@@ -240,3 +240,32 @@ type BasicTests () =
                 )
             )
         ParseAndTest xl_expr fp_expected
+
+    [<TestMethod>]
+    member self.ParensExpr1() =
+        // should be:
+        let xl_expr = "=(F9+G9)*B20"
+        let fp_expected =
+            let f9  = FPSymbol("f9")
+            let g9  = FPSymbol("g9")
+            let b20 = FPSymbol("b20")
+            FPCore(
+                [f9; g9; b20],
+                [],
+                Operation(
+                    MathOperation(
+                        Multiply,
+                        [Parens(
+                            Operation(
+                                MathOperation(
+                                    Plus,
+                                    [Symbol(f9);
+                                     Symbol(g9)]
+                                )
+                            )
+                        );
+                        Symbol(b20)]
+                    )
+                )
+            )
+        ParseAndTest xl_expr fp_expected
