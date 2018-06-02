@@ -57,17 +57,17 @@ type BasicTests () =
                     MathOperation(
                         Divide,
                         [Operation(
-                         MathOperation(
-                            Plus,
-                            [Operation(
-                                MathOperation(
-                                    Plus,
-                                    [Symbol(a1);
-                                     Symbol(a2)]
-                                )
-                            );
-                            Symbol(a3)]
-                         )
+                             MathOperation(
+                                Plus,
+                                [Operation(
+                                    MathOperation(
+                                        Plus,
+                                        [Symbol(a1);
+                                         Symbol(a2)]
+                                    )
+                                );
+                                Symbol(a3)]
+                             )
                         );
                         Num(FPNum(3.0))]
                     )

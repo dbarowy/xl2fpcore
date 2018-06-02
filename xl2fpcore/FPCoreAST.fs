@@ -299,6 +299,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
         | Let(e) -> e.ToExpr ind
         | While(e) -> e.ToExpr ind
         | PseudoList(xs) -> "[" + String.Join(",", (List.map (fun (s: FPExpr) -> s.ToExpr ind) xs)) + "]"
+        | Sentinel -> failwith "Cannot convert sentinel value to expression."
     override self.Equals(o: obj) =
         match o with
         | :? FPExpr as fpe ->
@@ -323,6 +324,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
         | Let(e) -> e.GetHashCode()
         | While(e) -> e.GetHashCode()
         | PseudoList(xs) -> xs.GetHashCode()
+        | Sentinel -> failwith "Cannot get hashcode for sentinel value."
     //override self.ToString() = self.ToExpr(0)
 
 and FPCore(args: FPSymbol list, props: FPProperty list, body: FPExpr) =

@@ -73,9 +73,10 @@ and XLCountUnroll(exprs: AST.Expression list) : int =
     match exprs with
     | x :: rest ->
         let xe,_ = ExprToFPExpr x
-        let count = match xe with
-        | PseudoList(xes) -> List.length xes
-        | _ -> 1
+        let count =
+            match xe with
+            | PseudoList(xes) -> List.length xes
+            | _ -> 1
         count + XLCountUnroll rest
     | [] -> 0
 
