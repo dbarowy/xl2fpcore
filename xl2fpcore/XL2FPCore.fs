@@ -30,7 +30,13 @@ and ExprToFPExpr(expr: AST.Expression) : FPExpr*FPSymbol list =
     match expr with
     | AST.ReferenceExpr(r) -> RefToFPExpr r
     | AST.BinOpExpr(op, e1, e2) -> BinOpToFPExpr op (ExprToFPExpr e1) (ExprToFPExpr e2)
-    | AST.UnaryOpExpr(op, e) -> failwith "todo 2"
+    | AST.UnaryOpExpr(op, e) ->
+        match op with
+        | '+' -> ExprToFPExpr e     // basically, ignore it
+        | '-' ->
+            let e2,args = ExprToFPExpr e
+            Operation(UnaryOperation(Negation, e2)), args
+        | opchar -> raise (InvalidExpressionException("Unknown unary operator '" + opchar.ToString() + "'"))
     | AST.ParensExpr(e) ->
         let e1,exs = ExprToFPExpr e
         Parens(e1),exs
@@ -59,13 +65,16 @@ and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
             let sum,args = XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[])
             let n = XLCountUnroll f.ArgumentList
             Operation(MathOperation(Divide, [sum; Num(double n)])), args
-        //| "ROUNDUP" ->
-        //    match f.ArgumentList with
-        //    | num::num_digits::nil -> 
-        //        let fparg,args = ExprToFPExpr num
-        //        let factor = Operation(MathOperation(Multiply, Num(10.0) 
-        //        Operation(MathOperation(Ceil, [fparg])), args
-        //    | _ -> raise (InvalidExpressionException("Unrecognized number of arguments in ROUNDUP."))
+        | "ROUNDUP" ->
+            match f.ArgumentList with
+            | xl_num::xl_num_digits::[] -> 
+                let num,args = ExprToFPExpr xl_num
+                let num_digits,args2 = ExprToFPExpr xl_num_digits
+                // factor = 10^num_digits
+                // we multiply num by factor, take the ceiling, then divide by factor
+                let factor = Operation(MathOperation(Multiply, [Num(10.0); num_digits]))
+                Operation(MathOperation(Divide, [Operation(MathOperation(Ceil, [Operation(MathOperation(Multiply, [num; factor]))])); factor])), args @ args2
+            | _ -> raise (InvalidExpressionException("ROUNDUP: Unrecognized number of arguments."))
         | "MAX" -> XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[])
         | "MIN" -> XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[])
         | "SUM" -> XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[])       

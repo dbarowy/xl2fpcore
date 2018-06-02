@@ -276,25 +276,26 @@ type BasicTests () =
         let xl_expr = "=ROUNDUP(H33,-1)"
         let fp_expected =
             let h33 = FPSymbol("h33")
+            let factor = Operation(MathOperation(Multiply, [Num(10.0); Operation(UnaryOperation(Negation, Num(1.0)))]))
             FPCore(
                 [h33],
                 [],
                 Operation(
                     MathOperation(
-                        Multiply,
+                        Divide,
                         [Operation(
                             MathOperation(
                                 Ceil,
                                 [Operation(
                                     MathOperation(
-                                        Divide,
+                                        Multiply,
                                         [Symbol(h33);
-                                         Num(10.0)]
+                                         factor]
                                     )
                                  )]
                             )
                         );
-                        Num(10.0)]
+                        factor]
                     )
                 )
             )

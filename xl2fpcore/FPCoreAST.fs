@@ -197,10 +197,16 @@ and FPMathOperation =
         | Trunc     -> "trunc"
         | Round     -> "round"
         | Nearbyint -> "nearbyint"
-
+and FPUnaryOperation =
+    | Negation
+    member self.ToExpr(ind: int) =
+        (Ind ind) +
+        match self with
+        | Negation -> "-"
 and FPOperation =
     | LogicalOperation of FPLogicalOperation * FPExpr list
     | MathOperation of FPMathOperation * FPExpr list
+    | UnaryOperation of FPUnaryOperation * FPExpr
     member self.ToExpr(ind: int) =
         match self with
         | LogicalOperation(op, exprs) ->
@@ -209,6 +215,8 @@ and FPOperation =
         | MathOperation(op, exprs) ->
             let exprStr = String.Join(" ", List.map (fun (e: FPExpr) -> e.ToExpr 0) exprs)
             (Ind ind) + "(" + op.ToExpr 0 + " " + exprStr + ")"
+        | UnaryOperation(op, expr) ->
+            (Ind ind) + op.ToExpr 0 + expr.ToExpr 0
 and [<CustomEquality; NoComparison>] FPProperty =
     | PropExpr of FPSymbol * FPExpr
     | PropString of FPSymbol * string
