@@ -220,7 +220,7 @@ type BasicTests () =
     [<TestMethod>]
     member self.PrecedenceTest() =
         // should be:
-        let xl_expr = "=2*2+2"
+        let xl_expr = "=3*2+1"
         let fp_expected =
             FPCore(
                 [],
@@ -231,11 +231,11 @@ type BasicTests () =
                         [Operation(
                             MathOperation(
                                 Multiply,
-                                [Num(FPNum(2.0));
+                                [Num(FPNum(3.0));
                                  Num(FPNum(2.0))]
                             )
                         );
-                        Num(FPNum(2.0))]
+                        Num(FPNum(1.0))]
                     )
                 )
             )
