@@ -26,17 +26,7 @@ open System.Numerics
 // indent function
 let Ind(n: int) = String.replicate n " "
 
-type FPNum(num: double) =
-    member self.ToExpr(ind: int) =
-        (Ind ind) + num.ToString()
-    member self.Num = num
-    override self.Equals(o: obj) =
-        match o with
-        | :? FPNum as fpn -> num = fpn.Num
-        | _ -> false
-    override self.GetHashCode() = num.GetHashCode()
-
-and FPConstant =
+type FPConstant =
     | E
     | LOG2E
     | LOG10E
@@ -279,7 +269,7 @@ and FPWhile(cond: FPExpr, binds: (FPSymbol*FPExpr*FPExpr) list, body: FPExpr) =
         (Ind ind) + "(while" + cond.ToExpr 0 + "(" + bindsStr + ")" + body.ToExpr 0 + ")"
 
 and [<CustomEquality; NoComparison>] FPExpr =
-    | Num of FPNum
+    | Num of double
     | Constant of FPConstant
     | Symbol of FPSymbol
     | Operation of FPOperation
@@ -291,7 +281,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
     | Sentinel                     // added by me; signals a nonsensical construction
     member self.ToExpr(ind: int) : string =
         match self with
-        | Num(n) -> n.ToExpr ind
+        | Num(n) -> n.ToString()
         | Constant(c) -> c.ToExpr ind
         | Symbol(s) -> s.ToExpr ind
         | Operation(op) -> op.ToExpr ind

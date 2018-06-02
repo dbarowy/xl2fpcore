@@ -33,7 +33,7 @@ type BasicTests () =
     [<TestMethod>]
     member self.SimpleConstantExpr() =
         let xl_expr = "=1"
-        let fp_expected = FPCore([], [], FPExpr.Num(FPNum(1.0)))
+        let fp_expected = FPCore([], [], FPExpr.Num(1.0))
         ParseAndTest xl_expr fp_expected
 
     [<TestMethod>]
@@ -70,7 +70,7 @@ type BasicTests () =
                                 Symbol(a3)]
                              )
                         );
-                        Num(FPNum(3.0))]
+                        Num(3.0)]
                     )
                 )
             )
@@ -120,14 +120,14 @@ type BasicTests () =
                                 [Operation(
                                     MathOperation(
                                         Fmin,
-                                        [Num(FPNum(1.0));
-                                         Num(FPNum(2.0))]
+                                        [Num(1.0);
+                                         Num(2.0)]
                                     )
                                  );
-                                 Num(FPNum(3.0))]
+                                 Num(3.0)]
                             )
                          );
-                         Num(FPNum(4.0))]
+                         Num(4.0)]
                     )
                 )
             )
@@ -177,14 +177,14 @@ type BasicTests () =
                                 [Operation(
                                     MathOperation(
                                         Fmax,
-                                        [Num(FPNum(1.0));
-                                         Num(FPNum(2.0))]
+                                        [Num(1.0);
+                                         Num(2.0)]
                                     )
                                  );
-                                 Num(FPNum(3.0))]
+                                 Num(3.0)]
                             )
                          );
-                         Num(FPNum(4.0))]
+                         Num(4.0)]
                     )
                 )
             )
@@ -231,11 +231,11 @@ type BasicTests () =
                         [Operation(
                             MathOperation(
                                 Multiply,
-                                [Num(FPNum(3.0));
-                                 Num(FPNum(2.0))]
+                                [Num(3.0);
+                                 Num(2.0)]
                             )
                         );
-                        Num(FPNum(1.0))]
+                        Num(1.0)]
                     )
                 )
             )
@@ -265,6 +265,36 @@ type BasicTests () =
                             )
                         );
                         Symbol(b20)]
+                    )
+                )
+            )
+        ParseAndTest xl_expr fp_expected
+
+    [<TestMethod>]
+    member self.ROUNDUPExpr1() =
+        // should be:
+        let xl_expr = "=ROUNDUP(H33,-1)"
+        let fp_expected =
+            let h33 = FPSymbol("h33")
+            FPCore(
+                [h33],
+                [],
+                Operation(
+                    MathOperation(
+                        Multiply,
+                        [Operation(
+                            MathOperation(
+                                Ceil,
+                                [Operation(
+                                    MathOperation(
+                                        Divide,
+                                        [Symbol(h33);
+                                         Num(10.0)]
+                                    )
+                                 )]
+                            )
+                        );
+                        Num(10.0)]
                     )
                 )
             )

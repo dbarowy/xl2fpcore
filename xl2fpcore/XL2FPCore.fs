@@ -3,6 +3,8 @@
 open FPCoreAST
 open System
 
+exception InvalidExpressionException of string
+
 let rec UnrollWithOp(exprs: FPExpr list)(op: FPMathOperation) : FPExpr =
     match exprs with
     | x1 :: x2 :: [] -> Operation(MathOperation(op, [x2; x1]))
@@ -45,7 +47,7 @@ and RefToFPExpr(r: AST.Reference) : FPExpr*FPSymbol list =
         Symbol(na), [na]
     | :? AST.ReferenceNamed as name -> failwith "todo 6"
     | :? AST.ReferenceFunction as func -> FunctionToFPExpr func
-    | :? AST.ReferenceConstant as c -> Num(FPNum(c.Value)),[]
+    | :? AST.ReferenceConstant as c -> Num(c.Value),[]
     | :? AST.ReferenceString as str -> failwith "todo 8"
     | :? AST.ReferenceBoolean as b -> failwith "todo 9"
     | _ -> failwith "Unknown reference expression."
@@ -56,7 +58,14 @@ and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
         | "AVERAGE" ->
             let sum,args = XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[])
             let n = XLCountUnroll f.ArgumentList
-            Operation(MathOperation(Divide, [sum; Num(FPNum(double n))])), args
+            Operation(MathOperation(Divide, [sum; Num(double n)])), args
+        //| "ROUNDUP" ->
+        //    match f.ArgumentList with
+        //    | num::num_digits::nil -> 
+        //        let fparg,args = ExprToFPExpr num
+        //        let factor = Operation(MathOperation(Multiply, Num(10.0) 
+        //        Operation(MathOperation(Ceil, [fparg])), args
+        //    | _ -> raise (InvalidExpressionException("Unrecognized number of arguments in ROUNDUP."))
         | "MAX" -> XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[])
         | "MIN" -> XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[])
         | "SUM" -> XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[])       
