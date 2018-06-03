@@ -65,16 +65,7 @@ and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
             let sum,args = XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[])
             let n = XLCountUnroll f.ArgumentList
             Operation(MathOperation(Divide, [sum; Num(double n)])), args
-        | "ROUNDUP" ->
-            match f.ArgumentList with
-            | xl_num::xl_num_digits::[] -> 
-                let num,args = ExprToFPExpr xl_num
-                let num_digits,args2 = ExprToFPExpr xl_num_digits
-                // factor = 10^num_digits
-                // we multiply num by factor, take the ceiling, then divide by factor
-                let factor = Operation(MathOperation(Multiply, [Num(10.0); num_digits]))
-                Operation(MathOperation(Divide, [Operation(MathOperation(Ceil, [Operation(MathOperation(Multiply, [num; factor]))])); factor])), args @ args2
-            | _ -> raise (InvalidExpressionException("ROUNDUP: Unrecognized number of arguments."))
+        | "ROUNDUP" -> ROUNDUP f.ArgumentList
         | "MAX" -> XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[])
         | "MIN" -> XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[])
         | "SUM" -> XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[])       
@@ -138,3 +129,61 @@ and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(de
     match proc (List.rev exprs) op with
     | Some expr -> expr
     | None -> def
+
+// (let ([base (pow 10 B)]) (/ (if (< A 0) (floor (* A base)) (ceil (* A base))) base)
+and ROUNDUP(args: AST.Expression list) =
+    match args with
+    | xl_num::xl_num_digits::[] -> 
+        let num,args = ExprToFPExpr xl_num
+        let num_digits,args2 = ExprToFPExpr xl_num_digits
+        // factor = 10^num_digits
+        // we multiply num by factor, take the ceiling, then divide by factor
+        let B = FPSymbol("base")
+        let factor =
+            Operation(
+                MathOperation(
+                    Pow,
+                    [Num(10.0); num_digits]
+                )
+            )
+        Let(
+            FPLet(
+                [(B, factor)],
+                Operation(
+                    MathOperation(
+                        Divide,
+                        [If(
+                            FPIf(
+                                Operation(
+                                    LogicalOperation(LessThan, [num; Num(0.0)])
+                                ),
+                                Operation(
+                                    MathOperation(
+                                        Floor,
+                                        [Operation(
+                                            MathOperation(
+                                                Multiply,
+                                                [num; Symbol(B)]
+                                            )
+                                        )]
+                                    )
+                                ),
+                                Operation(
+                                    MathOperation(
+                                        Ceil,
+                                        [Operation(
+                                            MathOperation(
+                                                Multiply,
+                                                [num; Symbol(B)]
+                                            )
+                                        )]
+                                    )
+                                )
+                            )
+                            );
+                            Symbol(B)]
+                    )
+                )
+            )
+        ), args @ args2
+    | _ -> raise (InvalidExpressionException("ROUNDUP: Unrecognized number of arguments."))

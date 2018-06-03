@@ -254,6 +254,18 @@ and FPIf(cond: FPExpr, dotrue: FPExpr, dofalse: FPExpr) =
         (Ind ind) + "(if " + cond.ToExpr 0 + (Ind 1) +
         dotrue.ToExpr (ind + 1) +
         dofalse.ToExpr (ind + 1) + ")"
+    member self.Condition = cond
+    member self.IfTrueDo = dotrue
+    member self.IfFalseDo = dofalse
+    override self.Equals(o: obj) =
+        match o with
+        | :? FPIf as fpi2 ->
+            cond = fpi2.Condition &&
+            dotrue = fpi2.IfTrueDo &&
+            dofalse = fpi2.IfFalseDo
+        | _ -> false
+    override self.GetHashCode() =
+        cond.GetHashCode() + dotrue.GetHashCode() + dofalse.GetHashCode()
 
 and FPLet(binds: (FPSymbol * FPExpr) list, in_expr: FPExpr) =
     // ( let ( [ symbol expr ]* ) expr )
@@ -264,6 +276,27 @@ and FPLet(binds: (FPSymbol * FPExpr) list, in_expr: FPExpr) =
                           "[" + (s.ToExpr 0) + " " + (e.ToExpr 0) + "]"
                         ) binds)
         (Ind ind) + "(let (" + bindsStr + ")" + (Ind 1) + in_expr.ToExpr (ind + 1) + ")"
+    member self.Bindings = binds
+    member self.Body = in_expr
+    override self.Equals(o: obj) =
+        match o with
+        | :? FPLet as fpl2 ->
+            // compare each element of the bindings
+            // as well as the body of the expression
+            List.zip binds fpl2.Bindings
+            |> List.fold
+                (fun acc ((symb1,expr1),(symb2,expr2)) ->
+                    acc &&
+                    symb1 = symb2 &&
+                    expr1 = expr2
+                ) true
+            && in_expr = fpl2.Body
+        | _ -> false
+    override self.GetHashCode() =
+        let b = 
+            binds |>
+            List.fold (fun acc (symb,expr) -> acc + symb.GetHashCode() + expr.GetHashCode()) 0
+        b + in_expr.GetHashCode()
 
 and FPWhile(cond: FPExpr, binds: (FPSymbol*FPExpr*FPExpr) list, body: FPExpr) =
     // ( while expr ( [ symbol expr expr ]* ) expr )
@@ -275,6 +308,29 @@ and FPWhile(cond: FPExpr, binds: (FPSymbol*FPExpr*FPExpr) list, body: FPExpr) =
                          )
                        )
         (Ind ind) + "(while" + cond.ToExpr 0 + "(" + bindsStr + ")" + body.ToExpr 0 + ")"
+    member self.Condition = cond
+    member self.Bindings = binds
+    member self.LoopBody = body
+    override self.Equals(o: obj) =
+        match o with
+        | :? FPWhile as fpw2 ->
+            let bs =
+                List.zip binds fpw2.Bindings
+                |> List.fold (fun acc ((s1,a1,b1),(s2,a2,b2)) ->
+                      acc &&
+                      s1 = s2 &&
+                      a1 = a2 &&
+                      b1 = b2
+                   ) true
+            cond = fpw2.Condition &&
+            bs &&
+            body = fpw2.LoopBody
+        | _ -> false
+    override self.GetHashCode() =
+        let b = 
+            binds |>
+            List.fold (fun acc (s,e1,e2) -> acc + s.GetHashCode() + e1.GetHashCode() + e2.GetHashCode()) 0
+        b + cond.GetHashCode() + body.GetHashCode()
 
 and [<CustomEquality; NoComparison>] FPExpr =
     | Num of double

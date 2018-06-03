@@ -3,8 +3,11 @@ namespace xl2fpcoretest
 open Microsoft.VisualStudio.TestTools.UnitTesting
 open FParsec
 open FPCoreAST
+open System
 
 exception ParseException of string
+
+
 
 [<TestClass>]
 type BasicTests () =
@@ -12,6 +15,7 @@ type BasicTests () =
     // handy shortcuts
     let XLParser = Grammar.Formula
     let EmptyEnvironment = AST.Env("", "", "")
+    //let fw = failwith "not done yet"    // for easier stubbing
 
     let GetAST str =
         let ast = 
@@ -272,30 +276,65 @@ type BasicTests () =
 
     [<TestMethod>]
     member self.ROUNDUPExpr1() =
-        // should be:
         let xl_expr = "=ROUNDUP(H33,-1)"
+        // should be:
         let fp_expected =
             let h33 = FPSymbol("h33")
-            let factor = Operation(MathOperation(Multiply, [Num(10.0); Operation(UnaryOperation(Negation, Num(1.0)))]))
+            let B = FPSymbol("base")
             FPCore(
                 [h33],
                 [],
-                Operation(
-                    MathOperation(
-                        Divide,
-                        [Operation(
+                Let(
+                    FPLet(
+                        [(B,
+                          Operation(
                             MathOperation(
-                                Ceil,
-                                [Operation(
-                                    MathOperation(
-                                        Multiply,
-                                        [Symbol(h33);
-                                         factor]
+                                Pow,
+                                [Num(10.0);
+                                 Operation(
+                                    UnaryOperation(
+                                        Negation,
+                                        Num(1.0)
                                     )
                                  )]
                             )
-                        );
-                        factor]
+                          )
+                        )],
+                        Operation(
+                            MathOperation(
+                                Divide,
+                                [If(
+                                    FPIf(
+                                        Operation(
+                                            LogicalOperation(LessThan, [Symbol(h33); Num(0.0)])
+                                        ),
+                                        Operation(
+                                            MathOperation(
+                                                Floor,
+                                                [Operation(
+                                                    MathOperation(
+                                                        Multiply,
+                                                        [Symbol(h33); Symbol(B)]
+                                                    )
+                                                )]
+                                            )
+                                        ),
+                                        Operation(
+                                            MathOperation(
+                                                Ceil,
+                                                [Operation(
+                                                    MathOperation(
+                                                        Multiply,
+                                                        [Symbol(h33); Symbol(B)]
+                                                    )
+                                                )]
+                                            )
+                                        )
+                                    )
+                                 );
+                                 Symbol(B)]
+                            )
+                        )
                     )
                 )
             )
