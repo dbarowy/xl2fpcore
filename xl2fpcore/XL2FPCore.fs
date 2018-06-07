@@ -54,8 +54,13 @@ and RefToFPExpr(r: AST.Reference) : FPExpr*FPSymbol list =
     | :? AST.ReferenceNamed as name -> failwith "todo 6"
     | :? AST.ReferenceFunction as func -> FunctionToFPExpr func
     | :? AST.ReferenceConstant as c -> Num(c.Value),[]
-    | :? AST.ReferenceString as str -> failwith "todo 8"
+    | :? AST.ReferenceString as str -> raise (InvalidExpressionException "FPCore does not support strings.")
     | :? AST.ReferenceBoolean as b -> failwith "todo 9"
+    | :? AST.ReferenceUnion as ru ->
+        let result = ru.References |> List.map (fun r -> ExprToFPExpr r)
+        let refs, args = List.unzip result
+        let arg = List.concat args
+        PseudoList(refs), arg
     | _ -> failwith "Unknown reference expression."
 
 and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
