@@ -226,7 +226,7 @@ and [<CustomEquality; NoComparison>] FPProperty =
         ":" +
         match self with
         | PropExpr(s,e) -> s.ToExpr 0 + Ind 1 + e.ToExpr 0
-        | PropString(s,s') -> s.ToExpr 0 + s'
+        | PropString(s,s') -> s.ToExpr 0 + " " + s'
         | PropSymbols(s,xs) ->
             let symbs = String.Join(" ", List.map (fun (sym: FPSymbol) -> sym.ToExpr 0) xs)
             (s.ToExpr 0) + symbs
@@ -393,7 +393,7 @@ and FPCore(args: FPSymbol list, props: FPProperty list, body: FPExpr) =
     member self.ToExpr(ind: int) =
         let argStr = String.Join(" ", List.map (fun (arg: FPSymbol) -> arg.ToExpr 0) args)
         let popStr = String.Join(" ", List.map (fun (prop: FPProperty) -> prop.ToExpr (ind + 1)) props)
-        (Ind ind) + "(FPCore (" + argStr + ")" + " " + popStr + " " + body.ToExpr (ind + 1) + ")"
+        (Ind ind) + "(FPCore (" + argStr + ")" + "\n " + popStr + "\n " + body.ToExpr (ind + 1) + ")"
     member self.Arguments = args
     member self.Properties = props
     member self.Body = body

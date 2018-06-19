@@ -2,6 +2,7 @@
 
 open FPCoreAST
 open System
+open System.Collections.Generic
 
 exception InvalidExpressionException of string
 
@@ -16,11 +17,33 @@ let NormalizeAddr(a: AST.Address) =
     // TODO:  use "local" addresses for now;
     // really, we should come up with a scheme
     // to get a fresh variable for every new reference
-    FPSymbol(a.A1Local().ToLower())
+    a.A1Local().ToLower()
 
-let rec FormulaToFPCore(expr: AST.Expression) : FPCore =
+let expandApplications(pre: List<Dictionary<AST.Address,double>>) : FPProperty option =
+    if pre.Count > 0 then
+        let logand =
+            pre |>
+            Seq.map (fun dict ->
+                let exprs = 
+                    dict |>
+                    Seq.map (fun kvp ->
+                        let name = (NormalizeAddr kvp.Key).ToString()
+                        let value = kvp.Value.ToString()
+                        "(= " + name + " " + value + ")"
+                    ) |>
+                    Seq.toList
+                "(and " + String.Join(" ", exprs) + ")"
+            )
+        let expr = "(or " + String.Join(" ", logand) + ")"
+        Some(PropString(FPSymbol("pre"), expr))
+    else
+        None
+
+let rec FormulaToFPCore(expr: AST.Expression)(pre: List<Dictionary<AST.Address,double>>) : FPCore =
     let expr,args = ExprToFPExpr(expr)
-    FPCore(args, [], expr)
+    match expandApplications pre with
+    | Some prop -> FPCore(args, [prop], expr)
+    | None      -> FPCore(args, [], expr)
 
 // returns a tuple of two things:
 // first: the converted FPCore expression
@@ -44,12 +67,12 @@ and RefToFPExpr(r: AST.Reference) : FPExpr*FPSymbol list =
     match r with
     | :? AST.ReferenceRange as rng -> 
         let addrs =
-            Array.map (fun a -> NormalizeAddr a) (rng.Range.Addresses())
+            Array.map (fun a -> FPSymbol(NormalizeAddr a)) (rng.Range.Addresses())
             |> Array.toList
         let pseudolist = addrs |> List.map (fun s -> Symbol(s)) |> (fun xs -> PseudoList(xs))
         pseudolist,addrs
     | :? AST.ReferenceAddress as addr ->
-        let na = NormalizeAddr (addr.Address)
+        let na = FPSymbol(NormalizeAddr (addr.Address))
         Symbol(na), [na]
     | :? AST.ReferenceNamed as name -> failwith "todo 6"
     | :? AST.ReferenceFunction as func -> FunctionToFPExpr func
