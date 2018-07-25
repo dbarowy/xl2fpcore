@@ -29,7 +29,7 @@ let expandApplications(pre: List<Dictionary<AST.Address,double>>) : FPProperty o
                     Seq.map (fun kvp ->
                         let name = (NormalizeAddr kvp.Key).ToString()
                         let value = kvp.Value.ToString()
-                        "(= " + name + " " + value + ")"
+                        "(== " + name + " " + value + ")"
                     ) |>
                     Seq.toList
                 "(and " + String.Join(" ", exprs) + ")"
