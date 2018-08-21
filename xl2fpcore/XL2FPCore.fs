@@ -4,6 +4,8 @@ open FPCoreAST
 open System
 open System.Collections.Generic
 
+type RefVars =  Dictionary<AST.Address,string>
+
 exception InvalidExpressionException of string
 
 let rec UnrollWithOp(exprs: FPExpr list)(op: FPMathOperation) : FPExpr =
@@ -13,13 +15,10 @@ let rec UnrollWithOp(exprs: FPExpr list)(op: FPMathOperation) : FPExpr =
     | [] -> failwith "Does this actually happen?"
     | x1 :: rest -> Operation(MathOperation(op, [UnrollWithOp rest op; x1]))
 
-let NormalizeAddr(a: AST.Address) =
-    // TODO:  use "local" addresses for now;
-    // really, we should come up with a scheme
-    // to get a fresh variable for every new reference
-    a.A1Local().ToLower()
+let NormalizeAddr(a: AST.Address)(refvars: RefVars) =
+    refvars.[a]
 
-let expandApplications(pre: List<Dictionary<AST.Address,double>>) : FPProperty option =
+let expandApplications(pre: List<Dictionary<string,double>>) : FPProperty option =
     if pre.Count > 0 then
         let logand =
             pre |>
@@ -27,7 +26,7 @@ let expandApplications(pre: List<Dictionary<AST.Address,double>>) : FPProperty o
                 let exprs = 
                     dict |>
                     Seq.map (fun kvp ->
-                        let name = (NormalizeAddr kvp.Key).ToString()
+                        let name = kvp.Key
                         let value = kvp.Value.ToString()
                         "(== " + name + " " + value + ")"
                     ) |>
@@ -39,8 +38,8 @@ let expandApplications(pre: List<Dictionary<AST.Address,double>>) : FPProperty o
     else
         None
 
-let rec FormulaToFPCore(expr: AST.Expression)(pre: List<Dictionary<AST.Address,double>>) : FPCore =
-    let expr,args = ExprToFPExpr(expr)
+let rec FormulaToFPCore(expr: AST.Expression)(pre: List<Dictionary<string,double>>)(refvars: RefVars) : FPCore =
+    let expr,args = ExprToFPExpr expr refvars
     match expandApplications pre with
     | Some prop -> FPCore(args, [prop], expr)
     | None      -> FPCore(args, [], expr)
@@ -49,54 +48,54 @@ let rec FormulaToFPCore(expr: AST.Expression)(pre: List<Dictionary<AST.Address,d
 // first: the converted FPCore expression
 // second: a list of symbols representing Excel references that
 //         must be abstracted as FPCore arguments
-and ExprToFPExpr(expr: AST.Expression) : FPExpr*FPSymbol list =
+and ExprToFPExpr(expr: AST.Expression)(refvars: RefVars) : FPExpr*FPSymbol list =
     match expr with
-    | AST.ReferenceExpr(r) -> RefToFPExpr r
-    | AST.BinOpExpr(op, e1, e2) -> BinOpToFPExpr op (ExprToFPExpr e1) (ExprToFPExpr e2)
+    | AST.ReferenceExpr(r) -> RefToFPExpr r refvars
+    | AST.BinOpExpr(op, e1, e2) -> BinOpToFPExpr op (ExprToFPExpr e1 refvars) (ExprToFPExpr e2 refvars)
     | AST.UnaryOpExpr(op, e) ->
         match op with
-        | '+' -> ExprToFPExpr e     // basically, ignore it
+        | '+' -> ExprToFPExpr e refvars    // basically, ignore it
         | '-' ->
-            let e2,args = ExprToFPExpr e
+            let e2,args = ExprToFPExpr e refvars
             Operation(UnaryOperation(Negation, e2)), args
         | opchar -> raise (InvalidExpressionException("Unknown unary operator '" + opchar.ToString() + "'"))
     | AST.ParensExpr(e) ->
-        let e1,exs = ExprToFPExpr e
+        let e1,exs = ExprToFPExpr e refvars
         Parens(e1),exs
-and RefToFPExpr(r: AST.Reference) : FPExpr*FPSymbol list =
+and RefToFPExpr(r: AST.Reference)(refvars: RefVars) : FPExpr*FPSymbol list =
     match r with
     | :? AST.ReferenceRange as rng -> 
         let addrs =
-            Array.map (fun a -> FPSymbol(NormalizeAddr a)) (rng.Range.Addresses())
+            Array.map (fun a -> FPSymbol(NormalizeAddr a refvars)) (rng.Range.Addresses())
             |> Array.toList
         let pseudolist = addrs |> List.map (fun s -> Symbol(s)) |> (fun xs -> PseudoList(xs))
         pseudolist,addrs
     | :? AST.ReferenceAddress as addr ->
-        let na = FPSymbol(NormalizeAddr (addr.Address))
+        let na = FPSymbol(NormalizeAddr addr.Address refvars)
         Symbol(na), [na]
     | :? AST.ReferenceNamed as name -> failwith "todo 6"
-    | :? AST.ReferenceFunction as func -> FunctionToFPExpr func
+    | :? AST.ReferenceFunction as func -> FunctionToFPExpr func refvars
     | :? AST.ReferenceConstant as c -> Num(c.Value),[]
     | :? AST.ReferenceString as str -> raise (InvalidExpressionException "FPCore does not support strings.")
     | :? AST.ReferenceBoolean as b -> failwith "todo 9"
     | :? AST.ReferenceUnion as ru ->
-        let result = ru.References |> List.map (fun r -> ExprToFPExpr r)
+        let result = ru.References |> List.map (fun r -> ExprToFPExpr r refvars)
         let refs, args = List.unzip result
         let arg = List.concat args
         PseudoList(refs), arg
     | _ -> failwith "Unknown reference expression."
 
-and FunctionToFPExpr(f: AST.ReferenceFunction) : FPExpr*FPSymbol list =
+and FunctionToFPExpr(f: AST.ReferenceFunction)(refvars: RefVars) : FPExpr*FPSymbol list =
     let expr,args =
         match f.FunctionName with
         | "AVERAGE" ->
-            let sum,args = XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[])
-            let n = XLCountUnroll f.ArgumentList
+            let sum,args = XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) refvars
+            let n = XLCountUnroll f.ArgumentList refvars
             Operation(MathOperation(Divide, [sum; Num(double n)])), args
-        | "ROUNDUP" -> ROUNDUP f.ArgumentList
-        | "MAX" -> XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[])
-        | "MIN" -> XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[])
-        | "SUM" -> XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[])       
+        | "ROUNDUP" -> ROUNDUP f.ArgumentList refvars
+        | "MAX" -> XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[]) refvars
+        | "MIN" -> XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[]) refvars
+        | "SUM" -> XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) refvars    
         | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
     
     match expr with
@@ -111,25 +110,25 @@ and BinOpToFPExpr(op: string)(e1: FPExpr*FPSymbol list)(e2: FPExpr*FPSymbol list
     | "/" -> Operation(MathOperation(Divide, [fst e1; fst e2])), (snd e1) @ (snd e2)
     | _ -> failwith "Unknown binary operator"
 
-and XLCountUnroll(exprs: AST.Expression list) : int =
+and XLCountUnroll(exprs: AST.Expression list)(refvars: RefVars) : int =
     match exprs with
     | x :: rest ->
-        let xe,_ = ExprToFPExpr x
+        let xe,_ = ExprToFPExpr x refvars
         let count =
             match xe with
             | PseudoList(xes) -> List.length xes
             | _ -> 1
-        count + XLCountUnroll rest
+        count + XLCountUnroll rest refvars
     | [] -> 0
 
-and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(def: FPExpr*FPSymbol list) : FPExpr*FPSymbol list =
+and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(def: FPExpr*FPSymbol list)(refvars: RefVars) : FPExpr*FPSymbol list =
     let rec proc(exprs: AST.Expression list)(op: FPMathOperation) =
         // we must match in pairs because we're unrolling with a binary op;
         // we also must expand pseudolists (ranges) into FPCore expression lists
         match exprs with
         | x1 :: x2 :: [] ->
-            let x1expr,x1args = ExprToFPExpr x1
-            let x2expr,x2args = ExprToFPExpr x2
+            let x1expr,x1args = ExprToFPExpr x1 refvars
+            let x2expr,x2args = ExprToFPExpr x2 refvars
                 
             let x1unroll =
                 match x1expr with
@@ -143,7 +142,7 @@ and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(de
 
             Some (Operation(MathOperation(op, [x2unroll; x1unroll])), x1args @ x2args)
         | x :: rest ->
-            let xe,xeargs = ExprToFPExpr x
+            let xe,xeargs = ExprToFPExpr x refvars
 
             let xeunroll =
                 match xe with
@@ -159,11 +158,11 @@ and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(de
     | None -> def
 
 // (let ([base (pow 10 B)]) (/ (if (< A 0) (floor (* A base)) (ceil (* A base))) base)
-and ROUNDUP(args: AST.Expression list) =
+and ROUNDUP(args: AST.Expression list)(refvars: RefVars) =
     match args with
     | xl_num::xl_num_digits::[] -> 
-        let num,args = ExprToFPExpr xl_num
-        let num_digits,args2 = ExprToFPExpr xl_num_digits
+        let num,args = ExprToFPExpr xl_num refvars
+        let num_digits,args2 = ExprToFPExpr xl_num_digits refvars
         // factor = 10^num_digits
         // we multiply num by factor, take the ceiling, then divide by factor
         let B = FPSymbol("base")
