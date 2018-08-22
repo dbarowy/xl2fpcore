@@ -5,6 +5,7 @@ open System
 open System.Collections.Generic
 
 type RefVars =  Dictionary<AST.Address,string>
+type Provenance = AST.Address[]
 
 exception InvalidExpressionException of string
 
@@ -18,7 +19,7 @@ let rec UnrollWithOp(exprs: FPExpr list)(op: FPMathOperation) : FPExpr =
 let NormalizeAddr(a: AST.Address)(refvars: RefVars) =
     refvars.[a]
 
-let expandApplications(pre: List<Dictionary<string,double>>) : FPProperty option =
+let expandApplications(pre: List<Dictionary<string,double>>) : FPProperty list =
     if pre.Count > 0 then
         let logand =
             pre |>
@@ -34,34 +35,53 @@ let expandApplications(pre: List<Dictionary<string,double>>) : FPProperty option
                 "(and " + String.Join(" ", exprs) + ")"
             )
         let expr = "(or " + String.Join(" ", logand) + ")"
-        Some(PropString(FPSymbol("pre"), expr))
+        [PropString(FPSymbol("pre"), expr)]
     else
-        None
+        []
 
-let rec FormulaToFPCore(expr: AST.Expression)(pre: List<Dictionary<string,double>>)(refvars: RefVars) : FPCore =
+let expandProvenance(prov: Provenance) : FPProperty list =
+    if prov.Length > 0 then
+        let prov_props =
+            prov |>
+            Array.map (fun addr ->
+                // By default, addresses are absolute; make them relative for props
+                let a1_rel = AST.Address.fromR1C1withMode(addr.Row, addr.Col, AST.AddressMode.Relative, AST.AddressMode.Relative, addr.WorksheetName, addr.WorkbookName, addr.Path)
+                "{ :excel_workbook "    + addr.WorkbookName     + "," +
+                 " :excel_worksheet "   + addr.WorksheetName    + "," +
+                 " :excel_cell "        + a1_rel.A1Local()      + " }"
+            )
+        let expr = "[ " + String.Join(", ", prov_props) + " ]"
+        [PropString(FPSymbol("excel_source"), expr)]
+    else
+        []
+
+let rec FormulaToFPCore(expr: AST.Expression)(pre: List<Dictionary<string,double>>)(refvars: RefVars)(prov: Provenance) : FPCore =
     let expr,args = ExprToFPExpr expr refvars
-    match expandApplications pre with
-    | Some prop -> FPCore(args, [prop], expr)
-    | None      -> FPCore(args, [], expr)
+    let props = expandApplications pre @ expandProvenance prov
+    FPCore(args, props, expr)
 
 // returns a tuple of two things:
 // first: the converted FPCore expression
 // second: a list of symbols representing Excel references that
 //         must be abstracted as FPCore arguments
 and ExprToFPExpr(expr: AST.Expression)(refvars: RefVars) : FPExpr*FPSymbol list =
-    match expr with
-    | AST.ReferenceExpr(r) -> RefToFPExpr r refvars
-    | AST.BinOpExpr(op, e1, e2) -> BinOpToFPExpr op (ExprToFPExpr e1 refvars) (ExprToFPExpr e2 refvars)
-    | AST.UnaryOpExpr(op, e) ->
-        match op with
-        | '+' -> ExprToFPExpr e refvars    // basically, ignore it
-        | '-' ->
-            let e2,args = ExprToFPExpr e refvars
-            Operation(UnaryOperation(Negation, e2)), args
-        | opchar -> raise (InvalidExpressionException("Unknown unary operator '" + opchar.ToString() + "'"))
-    | AST.ParensExpr(e) ->
-        let e1,exs = ExprToFPExpr e refvars
-        Parens(e1),exs
+    let expr',args =
+        match expr with
+        | AST.ReferenceExpr(r) -> RefToFPExpr r refvars
+        | AST.BinOpExpr(op, e1, e2) -> BinOpToFPExpr op (ExprToFPExpr e1 refvars) (ExprToFPExpr e2 refvars)
+        | AST.UnaryOpExpr(op, e) ->
+            match op with
+            | '+' -> ExprToFPExpr e refvars    // basically, ignore it
+            | '-' ->
+                let e2,args = ExprToFPExpr e refvars
+                Operation(UnaryOperation(Negation, e2)), args
+            | opchar -> raise (InvalidExpressionException("Unknown unary operator '" + opchar.ToString() + "'"))
+        | AST.ParensExpr(e) ->
+            let e1,exs = ExprToFPExpr e refvars
+            Parens(e1),exs
+    // make args distinct
+    let args' = List.distinct args
+    expr', args'
 and RefToFPExpr(r: AST.Reference)(refvars: RefVars) : FPExpr*FPSymbol list =
     match r with
     | :? AST.ReferenceRange as rng -> 
