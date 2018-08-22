@@ -79,9 +79,12 @@ and ExprToFPExpr(expr: AST.Expression)(refvars: RefVars) : FPExpr*FPSymbol list 
         | AST.ParensExpr(e) ->
             let e1,exs = ExprToFPExpr e refvars
             Parens(e1),exs
-    // make args distinct
-    let args' = List.distinct args
-    expr', args'
+    // make args distinct & sort by variable name
+    let args' =
+        args
+        |> List.distinct
+        |> List.sortBy (fun arg -> Convert.ToUInt32 (arg.String.Substring(1, arg.String.Length - 1)))
+    expr', (args')
 and RefToFPExpr(r: AST.Reference)(refvars: RefVars) : FPExpr*FPSymbol list =
     match r with
     | :? AST.ReferenceRange as rng -> 
