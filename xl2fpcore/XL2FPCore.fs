@@ -7,7 +7,8 @@ open System.Collections.Generic
 type RefVars =  Dictionary<AST.Address,string>
 type Provenance = AST.Address[]
 
-exception InvalidExpressionException of string
+type InvalidExpressionException(message: string) =
+    inherit Exception(message)
 
 let rec UnrollWithOp(exprs: FPExpr list)(op: FPMathOperation) : FPExpr =
     match exprs with
@@ -75,7 +76,7 @@ and ExprToFPExpr(expr: AST.Expression)(refvars: RefVars) : FPExpr*FPSymbol list 
             | '-' ->
                 let e2,args = ExprToFPExpr e refvars
                 Operation(UnaryOperation(Negation, e2)), args
-            | opchar -> raise (InvalidExpressionException("Unknown unary operator '" + opchar.ToString() + "'"))
+            | opchar -> raise (InvalidExpressionException("Unknown unary operator '" + opchar.ToString() + "'" + " in expression " + e.ToFormula))
         | AST.ParensExpr(e) ->
             let e1,exs = ExprToFPExpr e refvars
             Parens(e1),exs
@@ -99,7 +100,7 @@ and RefToFPExpr(r: AST.Reference)(refvars: RefVars) : FPExpr*FPSymbol list =
     | :? AST.ReferenceNamed as name -> failwith "todo 6"
     | :? AST.ReferenceFunction as func -> FunctionToFPExpr func refvars
     | :? AST.ReferenceConstant as c -> Num(c.Value),[]
-    | :? AST.ReferenceString as str -> raise (InvalidExpressionException "FPCore does not support strings.")
+    | :? AST.ReferenceString as str -> raise (InvalidExpressionException ("FPCore does not support strings in expression '" + str.ToFormula + "' in workbook '" + str.WorkbookName + "' on worksheet '" + str.WorksheetName + "'"))
     | :? AST.ReferenceBoolean as b -> failwith "todo 9"
     | :? AST.ReferenceUnion as ru ->
         let result = ru.References |> List.map (fun r -> ExprToFPExpr r refvars)
@@ -131,7 +132,8 @@ and BinOpToFPExpr(op: string)(e1: FPExpr*FPSymbol list)(e2: FPExpr*FPSymbol list
     | "-" -> Operation(MathOperation(Minus, [fst e1; fst e2])), (snd e1) @ (snd e2)
     | "*" -> Operation(MathOperation(Multiply, [fst e1; fst e2])), (snd e1) @ (snd e2)
     | "/" -> Operation(MathOperation(Divide, [fst e1; fst e2])), (snd e1) @ (snd e2)
-    | _ -> failwith "Unknown binary operator"
+    | "^" -> Operation(MathOperation(Pow, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | _ -> failwith ("Unknown binary operator in expression \"" + (fst e1).ToString() + " " + op + " " + (fst e2).ToString() + "\"")
 
 and XLCountUnroll(exprs: AST.Expression list)(refvars: RefVars) : int =
     match exprs with
