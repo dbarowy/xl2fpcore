@@ -47,9 +47,9 @@ let expandProvenance(prov: Provenance) : FPProperty list =
             Array.map (fun addr ->
                 // By default, addresses are absolute; make them relative for props
                 let a1_rel = AST.Address.fromR1C1withMode(addr.Row, addr.Col, AST.AddressMode.Relative, AST.AddressMode.Relative, addr.WorksheetName, addr.WorkbookName, addr.Path)
-                "{ :excel_workbook "    + addr.WorkbookName     + "," +
-                 " :excel_worksheet "   + addr.WorksheetName    + "," +
-                 " :excel_cell "        + a1_rel.A1Local()      + " }"
+                "{ :excel_workbook \""    + addr.WorkbookName     + "\"," +
+                 " :excel_worksheet \""   + addr.WorksheetName    + "\"," +
+                 " :excel_cell \""        + a1_rel.A1Local()      + "\" }"
             )
         let expr = "[ " + String.Join(", ", prov_props) + " ]"
         [PropString(FPSymbol("excel_source"), expr)]
