@@ -216,7 +216,7 @@ and FPOperation =
             let exprStr = String.Join(" ", List.map (fun (e: FPExpr) -> e.ToExpr 0) exprs)
             (Ind ind) + "(" + op.ToExpr 0 + " " + exprStr + ")"
         | UnaryOperation(op, expr) ->
-            (Ind ind) + op.ToExpr 0 + expr.ToExpr 0
+            (Ind ind) + "(" + op.ToExpr 0 + expr.ToExpr 0 + ")"
 and [<CustomEquality; NoComparison>] FPProperty =
     | PropExpr of FPSymbol * FPExpr
     | PropString of FPSymbol * string
