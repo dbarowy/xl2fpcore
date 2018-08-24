@@ -3,7 +3,6 @@
 open FPCoreAST
 open System
 open System.Collections.Generic
-open System.Linq.Expressions
 
 type Bindings =  Dictionary<AST.Address*bool*bool,string>
 type Provenance = AST.Address[]
@@ -111,7 +110,12 @@ and RefToFPExpr(r: AST.Reference)(bindings: Bindings) : FPExpr*FPSymbol list =
     | :? AST.ReferenceNamed as name -> failwith "todo 6"
     | :? AST.ReferenceFunction as func -> FunctionToFPExpr func bindings
     | :? AST.ReferenceConstant as c -> Num(c.Value),[]
-    | :? AST.ReferenceString as str -> raise (InvalidExpressionException ("FPCore does not support strings in expression '" + str.ToFormula + "' in workbook '" + str.WorkbookName + "' on worksheet '" + str.WorksheetName + "'"))
+    | :? AST.ReferenceString as str ->
+        // is it the empty string? if so, the user probably wants 0
+        if String.IsNullOrEmpty str.Value then
+            Num(0.0),[]
+        else
+            raise (InvalidExpressionException ("FPCore does not support strings in expression '" + str.ToFormula + "' in workbook '" + str.WorkbookName + "' on worksheet '" + str.WorksheetName + "'"))
     | :? AST.ReferenceBoolean as b -> Bool(b.Value),[]
     | :? AST.ReferenceUnion as ru ->
         let result = ru.References |> List.map (fun r -> ExprToFPExpr r bindings)
