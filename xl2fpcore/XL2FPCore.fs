@@ -127,15 +127,17 @@ and RefToFPExpr(r: AST.Reference)(bindings: Bindings) : FPExpr*FPSymbol list =
 and FunctionToFPExpr(f: AST.ReferenceFunction)(bindings: Bindings) : FPExpr*FPSymbol list =
     let expr,args =
         match f.FunctionName with
+        | "AND" ->      AND f.ArgumentList bindings
         | "AVERAGE" ->
             let sum,args = XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) bindings
             let n = XLCountUnroll f.ArgumentList bindings
             Operation(MathOperation(Divide, [sum; Num(double n)])), args
-        | "IF" -> IF f.ArgumentList bindings
-        | "MAX" -> XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[]) bindings
-        | "MIN" -> XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[]) bindings
-        | "ROUNDUP" -> ROUNDUP f.ArgumentList bindings
-        | "SUM" -> XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) bindings    
+        | "IF" ->       IF f.ArgumentList bindings
+        | "MAX" ->      XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[]) bindings
+        | "MIN" ->      XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[]) bindings
+        | "OR"  ->      OR f.ArgumentList bindings
+        | "ROUNDUP" ->  ROUNDUP f.ArgumentList bindings
+        | "SUM" ->      XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) bindings    
         | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
     
     match expr with
@@ -202,6 +204,16 @@ and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(de
     match proc (List.rev exprs) op with
     | Some expr -> expr
     | None -> def
+
+and AND(args: AST.Expression list)(bindings: Bindings) =
+    let exprs,argss = args |> List.map (fun arg -> ExprToFPExpr arg bindings) |> List.unzip
+    let args' = List.concat argss
+    Operation(LogicalOperation(LAnd, exprs)), args'
+
+and OR(args: AST.Expression list)(bindings: Bindings) =
+    let exprs,argss = args |> List.map (fun arg -> ExprToFPExpr arg bindings) |> List.unzip
+    let args' = List.concat argss
+    Operation(LogicalOperation(LOr, exprs)), args'
 
 and IF(args: AST.Expression list)(bindings: Bindings) =
     match args with
