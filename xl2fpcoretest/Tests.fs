@@ -4,10 +4,11 @@ open Microsoft.VisualStudio.TestTools.UnitTesting
 open FParsec
 open FPCoreAST
 open System
+open System.Collections.Generic
 
 exception ParseException of string
 
-
+type Bindings = System.Collections.Generic.Dictionary<AST.Address*bool*bool,string>
 
 [<TestClass>]
 type BasicTests () =
@@ -15,7 +16,6 @@ type BasicTests () =
     // handy shortcuts
     let XLParser = Grammar.Formula
     let EmptyEnvironment = AST.Env("", "", "")
-    //let fw = failwith "not done yet"    // for easier stubbing
 
     let GetAST str =
         let ast = 
@@ -24,15 +24,35 @@ type BasicTests () =
                 | Failure(errorMsg, _, _)   -> raise (ParseException errorMsg)
         ast
 
-    let ParseAndTest(xl_expr: string)(fp_expected: FPCore) : unit =
+    let ParseAndTestWithBindings(xl_expr: string)(fp_expected: FPCore)(bindings: Bindings) : unit =
         try
+            let pre = new List<Dictionary<string,double>>()
+            let prov = [||]
             let ast = GetAST xl_expr
-            let fp_got = XL2FPCore.FormulaToFPCore ast
+            let fp_got = XL2FPCore.FormulaToFPCore ast pre bindings prov
             let expected_str = fp_expected.ToExpr(0)
             let got_str = fp_got.ToExpr(0)
             Assert.AreEqual(fp_expected, fp_got)
         with
         | :? ParseException -> Assert.Fail()
+
+    let ParseAndTest(xl_expr: string)(fp_expected: FPCore) : unit =
+        try
+            let ast = GetAST xl_expr
+            let fp_got = XL2FPCore.FormulaToFPCoreSimple ast
+            let expected_str = fp_expected.ToExpr(0)
+            let got_str = fp_got.ToExpr(0)
+            Assert.AreEqual(fp_expected, fp_got)
+        with
+        | :? ParseException -> Assert.Fail()
+
+    let EZBindings(addrs: string list) : Bindings =
+        let bindings = new Bindings()
+        addrs
+        |> List.iter (fun addr ->
+            bindings.Add((AST.Address.FromA1String(addr.ToUpper(),"","",""), false, false), addr.ToLower())
+        )
+        bindings
 
     [<TestMethod>]
     member self.SimpleConstantExpr() =
@@ -43,14 +63,15 @@ type BasicTests () =
     [<TestMethod>]
     member self.SimpleReferenceExpr() =
         let xl_expr = "=A1"
+        let bindings = EZBindings ["a1"]
         let fp_expected = FPCore([FPSymbol("a1")], [], Symbol(FPSymbol("a1")))
-        ParseAndTest xl_expr fp_expected
+        ParseAndTestWithBindings xl_expr fp_expected bindings
 
     [<TestMethod>]
     member self.AVERAGEExpr1() =
         // should be: (FPCore (a1 a2 a3) (/ (+ (+ a1 a2) a3)3))
         let xl_expr = "=AVERAGE(A1:A3)"
-        let baz = 3.2
+        let bindings = EZBindings ["a1"; "a2"; "a3"]
         let fp_expected =
             let a1 = FPSymbol("a1")
             let a2 = FPSymbol("a2")
@@ -78,12 +99,13 @@ type BasicTests () =
                     )
                 )
             )
-        ParseAndTest xl_expr fp_expected
+        ParseAndTestWithBindings xl_expr fp_expected bindings
     
     [<TestMethod>]
     member self.MINExpr1() =
         // should be: (FPCore (a1 a2 a3) (fmin (fmin a1 a2) a3))
         let xl_expr = "=MIN(A1:A3)"
+        let bindings = EZBindings ["a1"; "a2"; "a3"]
         let fp_expected =
             let a1 = FPSymbol("a1")
             let a2 = FPSymbol("a2")
@@ -105,7 +127,7 @@ type BasicTests () =
                     )
                 )
             )
-        ParseAndTest xl_expr fp_expected
+        ParseAndTestWithBindings xl_expr fp_expected bindings
 
     [<TestMethod>]
     member self.MINExpr2() =
@@ -141,6 +163,7 @@ type BasicTests () =
     member self.MAXExpr1() =
         // should be: (FPCore (a1 a2 a3) (fmax (fmax a1 a2) a3))
         let xl_expr = "=MAX(A1:A3)"
+        let bindings = EZBindings ["a1"; "a2"; "a3"]
         let fp_expected =
             let a1 = FPSymbol("a1")
             let a2 = FPSymbol("a2")
@@ -162,7 +185,7 @@ type BasicTests () =
                     )
                 )
             )
-        ParseAndTest xl_expr fp_expected
+        ParseAndTestWithBindings xl_expr fp_expected bindings
 
     [<TestMethod>]
     member self.MAXExpr2() =
@@ -198,6 +221,7 @@ type BasicTests () =
     member self.SUMExpr1() =
         // should be: (FPCore (a1 a2 a3) (+ (+ a1 a2) a3))
         let xl_expr = "=SUM(A1:A3)"
+        let bindings = EZBindings ["a1"; "a2"; "a3"]
         let fp_expected =
             let a1 = FPSymbol("a1")
             let a2 = FPSymbol("a2")
@@ -219,7 +243,7 @@ type BasicTests () =
                     )
                 )
             )
-        ParseAndTest xl_expr fp_expected
+        ParseAndTestWithBindings xl_expr fp_expected bindings
 
     [<TestMethod>]
     member self.PrecedenceTest() =
@@ -249,6 +273,7 @@ type BasicTests () =
     member self.ParensExpr1() =
         // should be:
         let xl_expr = "=(F9+G9)*B20"
+        let bindings = EZBindings ["f9"; "g9"; "b20"]
         let fp_expected =
             let f9  = FPSymbol("f9")
             let g9  = FPSymbol("g9")
@@ -272,11 +297,12 @@ type BasicTests () =
                     )
                 )
             )
-        ParseAndTest xl_expr fp_expected
+        ParseAndTestWithBindings xl_expr fp_expected bindings
 
     [<TestMethod>]
     member self.ROUNDUPExpr1() =
         let xl_expr = "=ROUNDUP(H33,-1)"
+        let bindings = EZBindings ["h33"]
         // should be:
         let fp_expected =
             let h33 = FPSymbol("h33")
@@ -338,4 +364,41 @@ type BasicTests () =
                     )
                 )
             )
+        ParseAndTestWithBindings xl_expr fp_expected bindings
+
+    [<TestMethod>]
+    member self.IFExpr1() =
+        let xl_expr = "=IF(TRUE,1,0)"
+        let fp_expected =
+            FPCore(
+                [],
+                [],
+                If(
+                    FPIf(
+                        Bool(true),
+                        Num(1.0),
+                        Num(0.0)
+                    )
+                )
+            )
         ParseAndTest xl_expr fp_expected
+
+    [<TestMethod>]
+    member self.IFExpr2() =
+        let xl_expr = "=IF(A1,A2,A3)"
+        let bindings = EZBindings(["a1"; "a2"; "a3"])
+        let fp_expected =
+            FPCore(
+                [FPSymbol("a1");
+                 FPSymbol("a2");
+                 FPSymbol("a3")],
+                [],
+                If(
+                    FPIf(
+                        Symbol(FPSymbol("a1")),
+                        Symbol(FPSymbol("a2")),
+                        Symbol(FPSymbol("a3"))
+                    )
+                )
+            )
+        ParseAndTestWithBindings xl_expr fp_expected bindings

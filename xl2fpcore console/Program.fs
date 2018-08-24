@@ -25,7 +25,7 @@ let rec REPL() =
         try
             printfn "Parsing..."
             let ast = GetAST input
-            let fpstr = XL2FPCore.FormulaToFPCore ast
+            let fpstr = XL2FPCore.FormulaToFPCoreSimple ast 
             printfn "%A" (fpstr.ToExpr 0)
         with
         | :? AST.IndirectAddressingNotSupportedException as ex ->

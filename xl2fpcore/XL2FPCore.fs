@@ -3,6 +3,7 @@
 open FPCoreAST
 open System
 open System.Collections.Generic
+open System.Linq.Expressions
 
 type Bindings =  Dictionary<AST.Address*bool*bool,string>
 type Provenance = AST.Address[]
@@ -64,6 +65,12 @@ let rec FormulaToFPCore(expr: AST.Expression)(pre: List<Dictionary<string,double
     let props = expandApplications pre @ expandProvenance prov
     FPCore(args, props, expr')
 
+and FormulaToFPCoreSimple(expr: AST.Expression) : FPCore =
+    let pre = new List<Dictionary<string,double>>()
+    let bindings = new Bindings()
+    let provenance = [||]
+    FormulaToFPCore expr pre bindings provenance
+
 // returns a tuple of two things:
 // first: the converted FPCore expression
 // second: a list of symbols representing Excel references that
@@ -105,7 +112,7 @@ and RefToFPExpr(r: AST.Reference)(bindings: Bindings) : FPExpr*FPSymbol list =
     | :? AST.ReferenceFunction as func -> FunctionToFPExpr func bindings
     | :? AST.ReferenceConstant as c -> Num(c.Value),[]
     | :? AST.ReferenceString as str -> raise (InvalidExpressionException ("FPCore does not support strings in expression '" + str.ToFormula + "' in workbook '" + str.WorkbookName + "' on worksheet '" + str.WorksheetName + "'"))
-    | :? AST.ReferenceBoolean as b -> failwith "todo 9"
+    | :? AST.ReferenceBoolean as b -> Bool(b.Value),[]
     | :? AST.ReferenceUnion as ru ->
         let result = ru.References |> List.map (fun r -> ExprToFPExpr r bindings)
         let refs, args = List.unzip result
@@ -120,9 +127,10 @@ and FunctionToFPExpr(f: AST.ReferenceFunction)(bindings: Bindings) : FPExpr*FPSy
             let sum,args = XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) bindings
             let n = XLCountUnroll f.ArgumentList bindings
             Operation(MathOperation(Divide, [sum; Num(double n)])), args
-        | "ROUNDUP" -> ROUNDUP f.ArgumentList bindings
+        | "IF" -> IF f.ArgumentList bindings
         | "MAX" -> XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[]) bindings
         | "MIN" -> XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[]) bindings
+        | "ROUNDUP" -> ROUNDUP f.ArgumentList bindings
         | "SUM" -> XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) bindings    
         | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
     
@@ -137,6 +145,11 @@ and BinOpToFPExpr(op: string)(e1: FPExpr*FPSymbol list)(e2: FPExpr*FPSymbol list
     | "*" -> Operation(MathOperation(Multiply, [fst e1; fst e2])), (snd e1) @ (snd e2)
     | "/" -> Operation(MathOperation(Divide, [fst e1; fst e2])), (snd e1) @ (snd e2)
     | "^" -> Operation(MathOperation(Pow, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | ">" -> Operation(LogicalOperation(GreaterThan, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | "<" -> Operation(LogicalOperation(LessThan, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | ">=" -> Operation(LogicalOperation(GreaterThanOrEqual, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | "<=" -> Operation(LogicalOperation(LessThanOrEqual, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | "<>" -> Operation(LogicalOperation(NotEqual, [fst e1; fst e2])), (snd e1) @ (snd e2)
     | _ -> failwith ("Unknown binary operator in expression \"" + (fst e1).ToString() + " " + op + " " + (fst e2).ToString() + "\"")
 
 and XLCountUnroll(exprs: AST.Expression list)(bindings: Bindings) : int =
@@ -185,6 +198,20 @@ and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(de
     match proc (List.rev exprs) op with
     | Some expr -> expr
     | None -> def
+
+and IF(args: AST.Expression list)(bindings: Bindings) =
+    match args with
+    | cond :: if_expr :: else_expr :: nil -> 
+        let c_fp, c_args = ExprToFPExpr cond bindings
+        let i_fp, i_args = ExprToFPExpr if_expr bindings
+        let e_fp, e_args = ExprToFPExpr else_expr bindings
+        If(FPIf(
+            c_fp,
+            i_fp,
+            e_fp
+        )), c_args @ i_args @ e_args
+    | _ ->
+        raise (Exception(("IF expression must have exactly three arguments; expression has " + args.Length.ToString())))
 
 // (let ([base (pow 10 B)]) (/ (if (< A 0) (floor (* A base)) (ceil (* A base))) base)
 and ROUNDUP(args: AST.Expression list)(bindings: Bindings) =

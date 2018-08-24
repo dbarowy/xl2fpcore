@@ -252,7 +252,7 @@ and FPIf(cond: FPExpr, dotrue: FPExpr, dofalse: FPExpr) =
     // ( if expr expr expr )
     member self.ToExpr(ind: int) =
         (Ind ind) + "(if " + cond.ToExpr 0 + (Ind 1) +
-        dotrue.ToExpr (ind + 1) +
+        dotrue.ToExpr (ind + 1) + " " +
         dofalse.ToExpr (ind + 1) + ")"
     member self.Condition = cond
     member self.IfTrueDo = dotrue
@@ -333,6 +333,7 @@ and FPWhile(cond: FPExpr, binds: (FPSymbol*FPExpr*FPExpr) list, body: FPExpr) =
         b + cond.GetHashCode() + body.GetHashCode()
 
 and [<CustomEquality; NoComparison>] FPExpr =
+    | Bool of bool
     | Num of double
     | Constant of FPConstant
     | Symbol of FPSymbol
@@ -345,6 +346,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
     | Sentinel                     // added by me; signals a nonsensical construction
     member self.ToExpr(ind: int) : string =
         match self with
+        | Bool(b) -> b.ToString().ToUpper()
         | Num(n) -> n.ToString()
         | Constant(c) -> c.ToExpr ind
         | Symbol(s) -> s.ToExpr ind
@@ -359,6 +361,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
         match o with
         | :? FPExpr as fpe ->
             match self,fpe with
+            | Bool(b1),Bool(b2) -> b1 = b2
             | Num(n),Num(n2) -> n = n2
             | Constant(c),Constant(c2) -> c = c2
             | Symbol(s),Symbol(s2) -> s = s2
@@ -372,6 +375,7 @@ and [<CustomEquality; NoComparison>] FPExpr =
         | _ -> false
     override self.GetHashCode() =
         match self with
+        | Bool(b) -> b.GetHashCode()
         | Num(n) -> n.GetHashCode()
         | Constant(c) -> c.GetHashCode()
         | Symbol(s) -> s.GetHashCode()
@@ -382,7 +386,6 @@ and [<CustomEquality; NoComparison>] FPExpr =
         | While(e) -> e.GetHashCode()
         | PseudoList(xs) -> xs.GetHashCode()
         | Sentinel -> failwith "Cannot get hashcode for sentinel value."
-    //override self.ToString() = self.ToExpr(0)
 
 and FPCore(args: FPSymbol list, props: FPProperty list, body: FPExpr) =
     // (FPCore (x)
