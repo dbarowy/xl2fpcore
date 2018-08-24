@@ -128,16 +128,16 @@ and FunctionToFPExpr(f: AST.ReferenceFunction)(bindings: Bindings) : FPExpr*FPSy
     let expr,args =
         match f.FunctionName with
         | "AND" ->      AND f.ArgumentList bindings
-        | "AVERAGE" ->
-            let sum,args = XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) bindings
-            let n = XLCountUnroll f.ArgumentList bindings
-            Operation(MathOperation(Divide, [sum; Num(double n)])), args
+        | "AVERAGE" ->  AVERAGE f.ArgumentList bindings
+            
         | "IF" ->       IF f.ArgumentList bindings
         | "MAX" ->      XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[]) bindings
         | "MIN" ->      XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[]) bindings
         | "OR"  ->      OR f.ArgumentList bindings
         | "ROUNDUP" ->  ROUNDUP f.ArgumentList bindings
-        | "SUM" ->      XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) bindings    
+        | "STDEVP"  ->  STDEVP f.ArgumentList bindings
+        | "STDEV.P" ->  STDEVP f.ArgumentList bindings
+        | "SUM" ->      XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) bindings   
         | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
     
     match expr with
@@ -168,6 +168,19 @@ and XLCountUnroll(exprs: AST.Expression list)(bindings: Bindings) : int =
             | _ -> 1
         count + XLCountUnroll rest bindings
     | [] -> 0
+
+and XLMap(exprs: AST.Expression list)(f: FPExpr -> FPExpr)(bindings: Bindings) : FPExpr list*FPSymbol list =
+    match exprs with
+    | x :: rest ->
+        let xe,a = ExprToFPExpr x bindings
+        let fps =
+            match xe with
+            | PseudoList(xes) ->
+                xes |> List.map (fun fpexpr -> f fpexpr)
+            | _ -> [ f xe ]
+        let fps_r, a_r = XLMap rest f bindings
+        fps @ fps_r, a @ a_r
+    | [] -> [], []
 
 and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(def: FPExpr*FPSymbol list)(bindings: Bindings) : FPExpr*FPSymbol list =
     let rec proc(exprs: AST.Expression list)(op: FPMathOperation) =
@@ -204,6 +217,24 @@ and XLUnrollWithOpAndDefault(exprs: AST.Expression list)(op: FPMathOperation)(de
     match proc (List.rev exprs) op with
     | Some expr -> expr
     | None -> def
+
+and AVERAGE(args: AST.Expression list)(bindings: Bindings) =
+    let sum,args' = XLUnrollWithOpAndDefault args Plus (Sentinel,[]) bindings
+    let n = XLCountUnroll args bindings
+    Operation(MathOperation(Divide, [sum; Num(double n)])), args'
+
+and STDEVP(args: AST.Expression list)(bindings: Bindings) =
+    let aexpr,margs = AVERAGE args bindings
+    let aexpr_symb = FPSymbol("mean")
+    let dexprs,dargs = XLMap args (fun fexpr -> Operation(MathOperation(Pow, [Operation(MathOperation(Minus, [fexpr; Symbol(aexpr_symb)])); Num(2.0)]))) bindings
+    let mean_diff = Operation(MathOperation(Divide, [UnrollWithOp dexprs Plus; Num(double dexprs.Length)]))
+    let sqrt = Operation(MathOperation(Sqrt, [mean_diff]))
+    Let(
+        FPLet(
+            [(aexpr_symb, aexpr)],
+            sqrt
+        )
+    ), margs @ dargs
 
 and AND(args: AST.Expression list)(bindings: Bindings) =
     let exprs,argss = args |> List.map (fun arg -> ExprToFPExpr arg bindings) |> List.unzip
