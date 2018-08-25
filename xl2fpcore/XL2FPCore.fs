@@ -3,6 +3,7 @@
 open FPCoreAST
 open System
 open System.Collections.Generic
+open System.Runtime.Remoting
 
 type Bindings =  Dictionary<AST.Address*bool*bool,string>
 type Provenance = AST.Address[]
@@ -127,17 +128,18 @@ and RefToFPExpr(r: AST.Reference)(bindings: Bindings) : FPExpr*FPSymbol list =
 and FunctionToFPExpr(f: AST.ReferenceFunction)(bindings: Bindings) : FPExpr*FPSymbol list =
     let expr,args =
         match f.FunctionName with
-        | "AND" ->      AND f.ArgumentList bindings
-        | "AVERAGE" ->  AVERAGE f.ArgumentList bindings
-            
-        | "IF" ->       IF f.ArgumentList bindings
-        | "MAX" ->      XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[]) bindings
-        | "MIN" ->      XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[]) bindings
-        | "OR"  ->      OR f.ArgumentList bindings
-        | "ROUNDUP" ->  ROUNDUP f.ArgumentList bindings
-        | "STDEVP"  ->  STDEVP f.ArgumentList bindings
-        | "STDEV.P" ->  STDEVP f.ArgumentList bindings
-        | "SUM" ->      XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) bindings   
+        | "AND"     -> AND f.ArgumentList bindings
+        | "AVERAGE" -> AVERAGE f.ArgumentList bindings
+        | "IF"      -> IF f.ArgumentList bindings
+        | "MAX"     -> XLUnrollWithOpAndDefault f.ArgumentList Fmax (Sentinel,[]) bindings
+        | "MIN"     -> XLUnrollWithOpAndDefault f.ArgumentList Fmin (Sentinel,[]) bindings
+        | "NOT"     -> NOT f.ArgumentList bindings
+        | "OR"      -> OR f.ArgumentList bindings
+        | "ROUNDUP" -> ROUNDUP f.ArgumentList bindings
+        | "STDEVP"  -> STDEVP f.ArgumentList bindings
+        | "STDEV.P" -> STDEVP f.ArgumentList bindings
+        | "SUM"     -> XLUnrollWithOpAndDefault f.ArgumentList Plus (Sentinel,[]) bindings   
+        | "XOR"     -> XOR f.ArgumentList bindings
         | _ -> raise (Exception ("Unknown function '" + (f.FunctionName) + "'"))
     
     match expr with
@@ -156,6 +158,7 @@ and BinOpToFPExpr(op: string)(e1: FPExpr*FPSymbol list)(e2: FPExpr*FPSymbol list
     | ">=" -> Operation(LogicalOperation(GreaterThanOrEqual, [fst e1; fst e2])), (snd e1) @ (snd e2)
     | "<=" -> Operation(LogicalOperation(LessThanOrEqual, [fst e1; fst e2])), (snd e1) @ (snd e2)
     | "<>" -> Operation(LogicalOperation(NotEqual, [fst e1; fst e2])), (snd e1) @ (snd e2)
+    | "=" -> Operation(LogicalOperation(Equal, [fst e1; fst e2])), (snd e1) @ (snd e2)
     | _ -> failwith ("Unknown binary operator in expression \"" + (fst e1).ToString() + " " + op + " " + (fst e2).ToString() + "\"")
 
 and XLCountUnroll(exprs: AST.Expression list)(bindings: Bindings) : int =
@@ -245,6 +248,26 @@ and OR(args: AST.Expression list)(bindings: Bindings) =
     let exprs,argss = args |> List.map (fun arg -> ExprToFPExpr arg bindings) |> List.unzip
     let args' = List.concat argss
     Operation(LogicalOperation(LOr, exprs)), args'
+
+and NOT(args: AST.Expression list)(bindings: Bindings) =
+    let exprs,argss = args |> List.map (fun arg -> ExprToFPExpr arg bindings) |> List.unzip
+    let args' = List.concat argss
+    Operation(LogicalOperation(LNot, exprs)), args'
+
+and nand(arg1: FPExpr)(arg2: FPExpr) =
+    Operation(LogicalOperation(LNot, [Operation(LogicalOperation(LAnd, [arg1; arg2]))]))
+
+and xor(arg1: FPExpr)(arg2: FPExpr) =
+    nand (nand arg1 (nand arg1 arg2)) (nand arg2 (nand arg1 arg2))
+
+and XOR(args: AST.Expression list)(bindings: Bindings) =
+    let fpexprs,argss = args |> List.map (fun arg -> ExprToFPExpr arg bindings) |> List.unzip
+    let args' = argss |> List.concat
+    if args.Length > 1 then
+        let f = (fun a b -> xor a b)
+        List.reduce f fpexprs, args'
+    else
+        List.head fpexprs, args'
 
 and IF(args: AST.Expression list)(bindings: Bindings) =
     match args with
